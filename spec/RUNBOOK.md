@@ -57,10 +57,14 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
 | Facilitator base URL | `https://api.testnet.blocky402.com` | ✅ public |
 | Network id | `hedera:testnet` | |
 | Facilitator fee-payer | `0.0.7162784` — **re-read from `GET /supported`, do not hardcode** | |
-| Our Hedera account id | `0.0.10389769` | **TO FIX** — create + fund from faucet |
-| Our ECDSA private key | in `.env`, never committed | **TO FIX** |
-| `payTo` (our receiving account) | `0.0.10389769` | **TO FIX** |
-| Asset | `0.0.0` (HBAR); an HTS token id for token payments | |
+| Payer account (the agent) | `0.0.10389769` | ✅ funded from faucet |
+| Payee account (`payTo`, the gateway operator) | `0.0.10375344` | ✅ created |
+| Payer ECDSA private key | in `.env`, never committed | **TO FIX** |
+| Asset | `0.0.0` (HBAR) for the smoke test | ✅ |
+
+⚠️ **Two accounts on purpose.** A transfer to yourself nets to zero and Hedera rejects it — and the split is also the honest shape: the agent pays, the gateway operator receives.
+
+💡 **Optional upgrade, only once HBAR works**: settle in **HTS USDC** (`HEDERA_TESTNET_USDC` is exported by `@x402/hedera`). Two gains — the cost column becomes natively dollar-denominated, removing the declared HBAR→USD rate entirely, and it scores the Hedera extra point *"HTS tokens in the settlement path"* (2 → 3 of 7). Cost: the payee must first run a `TokenAssociateTransaction`. **Do not attempt before the HBAR round-trip settles** — otherwise a failure is ambiguous between the rail and the association.
 | SDK | `npm install @x402/hedera` · Node 18+ | |
 
 **Payment flow**: `GET /supported` → build `paymentRequirements` → client partially signs a `TransferTransaction` → `POST /verify` → `POST /settle` → present the payload base64-encoded as the `X-PAYMENT` header. The facilitator co-signs as fee-payer.
