@@ -6,7 +6,8 @@
   "description": "Whetstone harness — orchestrates paid model calls, verification gates, and receipts",
   "license": "MIT",
   "scripts": {
-    "pay:smoke": "node --env-file=../.env src/pay-smoke.mjs"
+    "pay:smoke": "node --env-file=../.env src/pay-smoke.mjs",
+    "model:smoke": "node --env-file=../.env src/model-smoke.mjs"
   },
   "dependencies": {
     "@x402/hedera": "^2.25.0"
