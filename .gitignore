@@ -1,0 +1,27 @@
+# secrets — never commit
+.env
+.env.*
+!.env.example
+*.key
+
+# foundry
+out/
+cache/
+cache_forge/
+broadcast/
+lib/
+
+# node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# subgraph
+subgraph/build/
+subgraph/generated/
+
+# harness local state (source of truth for retries, but not committed)
+harness/.runs/
+
+# os
+.DS_Store

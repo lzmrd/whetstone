@@ -1,0 +1,22 @@
+# Pinned toolchain. Every value here is serialized into each receipt —
+# if it changes, previously recorded gas numbers stop being comparable.
+# Values mirror OpenZeppelin's own foundry.toml so our gas figures match theirs.
+
+[profile.default]
+src = 'contracts/src'
+test = 'contracts/test'
+out = 'out'
+libs = ['lib']
+
+solc_version = '0.8.35'
+evm_version = 'osaka'      # ⚠️ verify hevm/halmos support on Monday; fall back to 'cancun' and DECLARE it
+optimizer = true
+optimizer_runs = 200
+
+# Differential fuzzing gate (level 2)
+[profile.default.fuzz]
+runs = 1024                # raise to 1_000_000 for the recorded batch
+seed = '0x1'               # pinned; the seed goes into the receipt
+
+[profile.ci]
+fuzz = { runs = 100_000 }
