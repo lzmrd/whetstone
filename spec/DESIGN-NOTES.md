@@ -91,7 +91,7 @@ Where the proof stops, an economic invitation to disprove takes over. `challenge
 
 ⚠️ **The window is declared, not resolved**: leaderboard rows carry a status — *provisional* / *challenged* / *settled*.
 
-### Why it went to roadmap (decision D7)
+### Why it went to roadmap (decision R7)
 
 Day 3 could hold one of two things, not both:
 

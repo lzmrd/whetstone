@@ -67,17 +67,17 @@ Whetstone has **two tracks with different architectures**. Conflating them is an
 
 | # | Decision |
 |---|---|
-| D1 | **One mutated variant per function**, fixed across all seeds. Seeds vary sampling only |
-| D2 | `restored_f` and `restored_M_f` are **hand-written**. If model-assisted, disclose it |
-| D3 | The **mutated variant is the run's v1 reference**. Gates prove against it |
-| D4 | Mutation is **semantic**, never cosmetic |
-| D5 | Report **median and dispersion**, never a single value |
-| D6 | MVP leaderboard = **CLI/JSON**. Minimal web view is a judged criterion (see §9) |
-| D7 | **Day 3 is The Graph.** The challenge contract moves to roadmap, and **"the EVM as arbiter" leaves the narrative** |
-| D8 | **Demo video: 2-4 minutes**, ≥720p, narrated by a human. No AI voiceover, no speed-up, no phone recording |
-| D9 | **Commit early and often.** Large single commits risk disqualification |
-| D10 | **The allocator is deterministic code, not an LLM.** An explicit policy (e.g. "next round to the best gas-saved-per-dollar, unless it produced ≥2 consecutive `UNKNOWN`"). An LLM allocator would add cost and non-reproducibility to a project whose thesis is measurement rigour — and a deterministic policy still satisfies *"an agent that budgets across providers"* |
-| D11 | **Write order per round: HCS first, then Base Sepolia.** The HCS sequence number is needed to build the pointer. The harness keeps a local log as the source of truth and retries a failed registry write |
+| R1 | **One mutated variant per function**, fixed across all seeds. Seeds vary sampling only |
+| R2 | `restored_f` and `restored_M_f` are **hand-written**. If model-assisted, disclose it |
+| R3 | The **mutated variant is the run's v1 reference**. Gates prove against it |
+| R4 | Mutation is **semantic**, never cosmetic |
+| R5 | Report **median and dispersion**, never a single value |
+| R6 | MVP leaderboard = **CLI/JSON**. Minimal web view is a judged criterion (see §9) |
+| R7 | **Day 3 is The Graph.** The challenge contract moves to roadmap, and **"the EVM as arbiter" leaves the narrative** |
+| R8 | **Demo video: 2-4 minutes**, ≥720p, narrated by a human. No AI voiceover, no speed-up, no phone recording |
+| R9 | **Commit early and often.** Large single commits risk disqualification |
+| R10 | **The allocator is deterministic code, not an LLM.** An explicit policy (e.g. "next round to the best gas-saved-per-dollar, unless it produced ≥2 consecutive `UNKNOWN`"). An LLM allocator would add cost and non-reproducibility to a project whose thesis is measurement rigour — and a deterministic policy still satisfies *"an agent that budgets across providers"* |
+| R11 | **Write order per round: HCS first, then Base Sepolia.** The HCS sequence number is needed to build the pointer. The harness keeps a local log as the source of truth and retries a failed registry write |
 
 ---
 
@@ -188,7 +188,7 @@ Three environments with distinct roles. State this explicitly or it reads as con
 
 A contract observes nothing. **The harness sends a transaction to `RunRegistry.record(...)` after each run**; the contract only emits.
 
-**Per-round write order** (D11):
+**Per-round write order** (R11):
 
 ```
 1. round ends → harness assembles the receipt JSON
@@ -338,7 +338,7 @@ Hand-written semantic variant · `restored_M` + proof · gas precondition check 
 
 > From here on something exists to present even if everything else collapses.
 
-**Wednesday 9 — The Graph, and nothing else** (D7)
+**Wednesday 9 — The Graph, and nothing else** (R7)
 `RunRegistry` deployed on Base Sepolia · subgraph published to Subgraph Studio · allocator genuinely driven by the data
 
 > ⚠️ Heavier than originally planned: it now includes a contract deploy. Start with the registry, not the allocator.
@@ -364,7 +364,7 @@ Ratchet · procedural mutation engine · control family · cross-family dispersi
 1. **Formal equivalence**, three escalating levels: patch on ordinary Solidity → `OZ ≡ restored` on **assembly** → whether the tool covers **revert payloads**. Without #2 there is no denominator; without #3 reverts drop to gate 2.
 2. **Reduced novelty**: with GasAgent and RAGas published, only the guarantee and cost layer remains.
 3. **Scope**: days 1-2 are almost entirely manual verification. If that base is not standing by the end of day 2, nothing else has anything to rest on.
-4. **Public, repeatable tasks**: D1 makes the task known. The price of tractability, declared.
+4. **Public, repeatable tasks**: R1 makes the task known. The price of tractability, declared.
 
 ---
 

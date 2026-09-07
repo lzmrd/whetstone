@@ -2,7 +2,7 @@
 pragma solidity 0.8.35;
 
 /// ═══════════════════════════════════════════════════════════════════════════
-///  restored_f  —  HAND-WRITTEN BY THE BUILDER. See decision D2.
+///  restored_f  —  HAND-WRITTEN BY THE BUILDER. See decision R2.
 ///
 ///  If a model writes this, the baseline becomes AI work and the metric
 ///  measures AI against AI. Any model assistance here must be disclosed

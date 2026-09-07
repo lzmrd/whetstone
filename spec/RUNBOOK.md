@@ -44,7 +44,7 @@ One page. No new concepts: everything is extracted from [WHETSTONE.md](WHETSTONE
 
 ⚠️ **`osaka` may outrun the tools.** Symbolic execution engines lag behind hardforks. If hevm/halmos do not support `osaka` on Monday, drop to `cancun` and **declare the divergence from OZ's own config** in the receipt. This is a day-1 spike item, not a config detail.
 
-⚠️ **Hedera runs Cancun, not osaka** (Besu with modifications: no blobs, Type 3 transactions rejected). It does **not** affect current scope — the target Solidity is never deployed to Hedera; Hedera carries x402 payments and HCS receipts only, and the pinned Foundry EVM is the sole authority over gas and equivalence. It becomes binding in two roadmap cases: the challenge contract (D7), and the optional "deploy before/after to testnet" demo touch. **In those cases compile that artifact with `cancun`** and declare it.
+⚠️ **Hedera runs Cancun, not osaka** (Besu with modifications: no blobs, Type 3 transactions rejected). It does **not** affect current scope — the target Solidity is never deployed to Hedera; Hedera carries x402 payments and HCS receipts only, and the pinned Foundry EVM is the sole authority over gas and equivalence. It becomes binding in two roadmap cases: the challenge contract (R7), and the optional "deploy before/after to testnet" demo touch. **In those cases compile that artifact with `cancun`** and declare it.
 
 💡 **Bonus found in solady**: `fullMulDivUnchecked` (line 521) ships alongside `fullMulDiv`. The same library carries the checked and unchecked versions, so **the price of dropped semantics is measurable between two of their own functions** — and `restored_f` becomes a small delta over `fullMulDiv` (align the error behaviour to OZ's) instead of a rewrite.
 
@@ -193,7 +193,7 @@ NEVER cut:
     (WHETSTONE §10, beat 3)
 ```
 
-**Challenge contract**: already roadmap per decision D7. If it is absent, **do not say "the EVM as arbiter"** in the demo or the README.
+**Challenge contract**: already roadmap per decision R7. If it is absent, **do not say "the EVM as arbiter"** in the demo or the README.
 
 ---
 

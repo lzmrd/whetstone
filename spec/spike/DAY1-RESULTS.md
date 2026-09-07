@@ -87,3 +87,57 @@ Machine has 15 GB RAM; ~5 GB free during the runs.
 - [ ] If `mulDiv` proves out of reach, fall back to a smaller fixed-size target and say why
 
 ⚠️ **If `UNKNOWN` is the best available on every candidate**, the headline metric loses its denominator and branch B from DESIGN-NOTES applies: the story becomes the price of semantics, measured, rather than the percentage closed.
+
+---
+
+# Addendum — the trilemma, measured
+
+A review raised what it called the function trilemma: a target must be
+**(a)** optimizable enough to leave a measurable gap, **(b)** tractable for
+symbolic equivalence, and **(c)** mutable by hand while preserving difficulty.
+`mulDiv` maximizes (a) and minimizes (b) and (c). The critique is correct, and
+none of the specs named it.
+
+It is also testable. Five candidate targets, OZ vs solady, same wrapper shape:
+
+| Target | Equivalence verdict | Label | Gas (OZ → solady, 10-input fixture) |
+|---|---|---|---|
+| `mulDiv` | **NOT equivalent** — concrete counterexample | n/a | large headroom, semantics gap real |
+| `sqrt` | no difference found, **partial exploration** | `UNKNOWN` | not measured |
+| `log10` | no difference found, **partial exploration** | `UNKNOWN` | not measured |
+| **`log2`** | **PASS, complete exploration** | **`FORMAL_NO_EXPLICIT_INPUT_BOUND`** | 2740 → 2220 = **520 saved, 19%** |
+| **`log256`** | **PASS, complete exploration** | **`FORMAL_NO_EXPLICIT_INPUT_BOUND`** | 2250 → 1980 = **270 saved, 12%** |
+
+## What this changes
+
+**Leg (b) has a solution.** `log2` and `log256` are provable end to end, in
+seconds, with no bounds and no partial-exploration warning.
+
+**Leg (c) becomes feasible.** These are simple enough to mutate semantically by
+hand — unlike rewriting correct 512-bit assembly, which is researcher work.
+
+**`restored_f` is not needed for these targets.** OZ and solady are *proven
+equivalent* on `log2` and `log256`, so the baseline is solady itself: externally
+authored, not written by us. That removes the circularity concern, the
+hand-writing burden, and the force of rule **R2** for this target. `restored_M`
+is still hand-written, but over a much simpler function.
+
+**Branch A and Branch B both exist, on different functions.**
+
+- `log2` / `log256`: the gap is **entirely free lunch** — equivalence is proven,
+  so no semantics were paid. Branch A.
+- `mulDiv`: the gap **includes a semantics component** — `Panic(0x12)` versus
+  `FullMulDivFailed()`. Branch B, and the price of semantics is real.
+
+That is a richer result than either branch alone, and it is measured.
+
+## The cost, stated plainly
+
+⚠️ **Headroom on `log2` is 52 gas per call (19%).** Real, but small in absolute
+terms, so the denominator is coarse: a model saving 20 gas scores 38%. The
+quantization must be shown, not smoothed over.
+
+⚠️ **Gas is constant across all ten fixtures** for both implementations on
+`log2` — this target is branchless. That is a finding, not an assumption, and it
+is only knowable by measuring across a fixture set. The scenario stays in the
+receipt regardless: for other targets it will not be constant.

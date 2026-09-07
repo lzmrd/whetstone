@@ -44,7 +44,7 @@ Two artifacts are hand-written as a **methodological requirement**, not a formal
 - `restored_f` — solady's implementation with OpenZeppelin's checks restored
 - `restored_M_f` — the same, under the semantic mutation
 
-These define the baseline the models are measured against. If a model wrote them, the metric would be measuring AI work against AI work. See decision **D2** in [spec/WHETSTONE.md](spec/WHETSTONE.md).
+These define the baseline the models are measured against. If a model wrote them, the metric would be measuring AI work against AI work. See decision **R2** in [spec/WHETSTONE.md](spec/WHETSTONE.md).
 
 Any model assistance on these two files must be disclosed here explicitly.
 
