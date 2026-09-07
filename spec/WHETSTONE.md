@@ -162,7 +162,7 @@ punish a model.
 | # | Decision |
 |---|---|
 | R1 | **One mutated variant per function**, fixed across all seeds. Seeds vary sampling only |
-| R2 | `restored_f` and `restored_M_f` are **hand-written**. If model-assisted, disclose it |
+| R2 | The mutation **`M`** is the human artifact of Track S, and its authorship is a **declared fact**, not an assumption: hand-written unless [AI_USAGE.md](../AI_USAGE.md) says otherwise. ⚠️ Earlier revisions named `restored_f`/`restored_M_f` — day-1 measurement deleted those artifacts (OZ ≡ solady already holds on the chosen targets), so the rule now attaches to what actually exists. See D-04 |
 | R3 | The **mutated variant is the run's v1 reference**. Gates prove against it |
 | R4 | Mutation is **semantic**, never cosmetic |
 | R5 | Report **median and dispersion**, never a single value |
@@ -172,6 +172,8 @@ punish a model.
 | R9 | **Commit early and often.** Large single commits risk disqualification |
 | R10 | **The allocator is deterministic code, not an LLM.** An explicit policy (e.g. "next round to the best gas-saved-per-dollar, unless it produced ≥2 consecutive `UNKNOWN`"). An LLM allocator would add cost and non-reproducibility to a project whose thesis is measurement rigour — and a deterministic policy still satisfies *"an agent that budgets across providers"* |
 | R11 | **Write order per round: HCS first, then Base Sepolia.** The HCS sequence number is needed to build the pointer. The harness keeps a local log as the source of truth and retries a failed registry write |
+| R12 | **`scripts/selfcheck.sh` gates every measured run.** It asserts, in both directions, that hevm still compares revert payloads (negative) and can still prove a real equivalence (positive), and that the gas instrument is order-neutral. A failing self-check means no run is scored or published |
+| R13 | **The checker version is part of the claim, not metadata.** `hevm 0.58.0` is pinned and written into every receipt, because the revert-payload behaviour the whole gate depends on is **undocumented** and can change between releases without notice |
 
 ---
 

@@ -26,6 +26,9 @@ contract OrderControlTest is Test {
             tFirst += a;
             tSecond += b;
         }
+        // casting to 'int256' is safe because both totals are gas sums over 769
+        // calls -- bounded by the block gas limit, nowhere near 2**255.
+        // forge-lint: disable-next-line(unsafe-typecast)
         return int256(tFirst) - int256(tSecond);
     }
 

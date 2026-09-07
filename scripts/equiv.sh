@@ -54,20 +54,39 @@ head -6 "$OUT/result.txt"
 echo "  …full output: $OUT/result.txt"
 
 # ── the label this run earns ────────────────────────────────────────────
-partial=$(grep -c 'partially explore' "$OUT/result.txt" || true)
-if grep -q 'behave equivalently' "$OUT/result.txt"; then
-  if [ "$partial" -gt 0 ]; then
-    echo "▸ LABEL: UNKNOWN  — no difference found, but exploration was partial."
-    echo "         Partial exploration is NOT a proof of equivalence."
-  elif [ -n "${MAXITER:-}" ] && [ "${MAXITER}" != "-1" ]; then
+#
+# ⚠️ Match on hevm's [PASS]/[FAIL] marker, NOT on the phrase "behave
+# equivalently". hevm prints "Contracts behave equivalently" on success and
+# "Contracts may not behave equivalently" on failure -- the failure string
+# CONTAINS the success string, so a substring test reports every failure as a
+# pass. That bug was live in this script and was caught only because a run
+# happened to be inspected by hand.
+strip() { sed -r 's/\x1B\[[0-9;]*[mK]//g' "$1"; }
+plain=$(strip "$OUT/result.txt")
+
+partial=0;  grep -q 'partially explore'         <<<"$plain" && partial=1
+passed=0;   grep -q '\[PASS\] Contracts behave' <<<"$plain" && passed=1
+cex=0;      grep -qiE 'calldata|counterexample'  <<<"$plain" && cex=1
+
+if [ "$cex" = 1 ]; then
+  echo "▸ NOT EQUIVALENT -- counterexample above."
+  echo "         A counterexample stays sound even under partial exploration:"
+  echo "         it is a claim about one input, checkable by running both."
+elif [ "$passed" = 1 ] && [ "$partial" = 0 ]; then
+  if [ -n "${MAXITER:-}" ] && [ "${MAXITER}" != "-1" ]; then
     echo "▸ LABEL: FORMAL_BOUNDED  (max-iterations=${MAXITER})"
   else
     echo "▸ LABEL: FORMAL_NO_EXPLICIT_INPUT_BOUND"
     echo "         …within the ABI domain and the wrapper assumptions."
   fi
 else
-  echo "▸ NOT EQUIVALENT — counterexample above."
-  echo "         A counterexample stays sound even under partial exploration:"
-  echo "         it is a claim about one input, checkable by running both."
+  echo "▸ LABEL: UNKNOWN -- exploration was incomplete and no counterexample was found."
+  echo "         Neither a proof nor a refutation. Incomplete exploration is NOT"
+  echo "         evidence of equivalence, and must never be reported as one."
 fi
+
+# ── what the receipt must carry ─────────────────────────────────────────
+# The revert-payload behaviour this project depends on is undocumented, so the
+# checker version is part of the claim, not metadata.
+echo "▸ checker: $(hevm version 2>&1 | head -1) | solver=$SOLVER | max-iterations=${MAXITER:--1}"
 exit $code
