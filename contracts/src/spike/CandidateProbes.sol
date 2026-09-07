@@ -19,3 +19,14 @@ contract SdLog10   { function f(uint256 x) external pure returns (uint256) { ret
 
 contract OzLog256  { function f(uint256 x) external pure returns (uint256) { return Math.log256(x); } }
 contract SdLog256  { function f(uint256 x) external pure returns (uint256) { return S.log256(x); } }
+
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {LibString} from "solady/utils/LibString.sol";
+
+// High-headroom candidates: toString is a famously large OZ-vs-solady gap.
+// Returns string memory, so hevm must compare return-data buffers.
+contract OzToString { function f(uint256 x) external pure returns (string memory) { return Strings.toString(x); } }
+contract SdToString { function f(uint256 x) external pure returns (string memory) { return LibString.toString(x); } }
+
+contract OzToHex    { function f(uint256 x) external pure returns (string memory) { return Strings.toHexString(x); } }
+contract SdToHex    { function f(uint256 x) external pure returns (string memory) { return LibString.toHexString(x); } }

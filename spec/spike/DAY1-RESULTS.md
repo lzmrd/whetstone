@@ -141,3 +141,50 @@ quantization must be shown, not smoothed over.
 `log2` — this target is branchless. That is a finding, not an assumption, and it
 is only knowable by measuring across a fixture set. The scenario stays in the
 receipt regardless: for other targets it will not be constant.
+
+---
+
+# Addendum 2 — the measuring instrument was unstable
+
+⚠️ **Before trusting any gap figure, the method had to be fixed.**
+
+Measuring with `gasleft()` deltas around *inlined internal* calls inside a test
+is not stable. The `log256` figure moved **27 → 39 gas/call** purely because
+unrelated imports and test functions were added to the same file: the surrounding
+compiled code shifts, and the delta absorbs it.
+
+**Stable method**: deploy each wrapper — the same one hevm proves equivalence on —
+and measure a `staticcall` to it. Call overhead is constant and cancels in the
+A-vs-B delta. `contracts/test/GasStable.t.sol`.
+
+## Corrected figures, stable method, 10-input fixture
+
+| Target | Verdict | Label | Gas/call saved |
+|---|---|---|---|
+| `log2` | proven equivalent | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | 51 |
+| **`log256`** | proven equivalent | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | **66** |
+| `toString` | partial exploration | `UNKNOWN` | 486 |
+| **`toHexString`** | partial exploration | `UNKNOWN` | **4 833** |
+| `sqrt`, `log10` | partial exploration | `UNKNOWN` | not measured |
+| `mulDiv` | **not** equivalent, counterexample | — | semantics-laden |
+
+## The trilemma does not break at high headroom
+
+`toString` and `toHexString` return `string memory`. Both are **intractable** —
+partial exploration, `UNKNOWN`. High headroom and symbolic tractability did not
+coexist in any candidate tested.
+
+## Proposed pairing — and why it is better than two FORMAL rows
+
+| Role | Target | Label | Headroom |
+|---|---|---|---|
+| Primary | **`log256`** | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | 66 gas |
+| Secondary | **`toHexString`** | `FUZZED` | 4 833 gas |
+
+A guarantee vocabulary that only ever prints one label is decoration. Two targets
+earning **two different labels**, with the leaderboard saying which is which, is
+the vocabulary doing its job — and it is the honest way to include a target with
+real headroom for the agent to contend for.
+
+⚠️ `toHexString` rows carry `FUZZED`, never `FORMAL`. That is the point, not a
+concession.
