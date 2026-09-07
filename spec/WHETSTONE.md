@@ -314,8 +314,16 @@ the gas number. No hints, no guidance, nothing hand-written per model.
 | `max_rounds` | **8** |
 | `max_tokens` per reply | **6 000**. ⚠️ Part of the interface, not a knob. A reasoning model that never reaches an answer inside it earns the outcome `truncated`, which is comparable across models *because* the ceiling is fixed. Set below Groq's free-tier 8 000-tokens-per-minute cap, which counts the prompt too |
 | `budget_usd_per_run` | **0.05** at list price, whichever binds first |
-| `temperature` | provider default, recorded in the receipt |
+| `temperature` | **0.2, fixed and declared.** ⚠️ Was "provider default, recorded in the receipt" — but no provider returns it, so the receipt recorded `null` and the run was not reproducible even by us. The value is arbitrary; being fixed and identical across models is what matters. Not 0, because R1 wants seeds to vary sampling |
+| `seed` | Passed explicitly per run. ⚠️ **Best-effort**: providers batch on shared GPUs and none guarantees bit-identical output, so the receipt records what was *sent*, never what was honoured |
 | System prompt | one, fixed, committed in the repo and hashed into the receipt |
+
+⚠️ **Fixing them does not remove the variance.** Four runs of one model on one
+task, before temperature was pinned, returned **+291, +136, +263 and −60 gas per
+call** — the last one a *proved-equivalent* patch that regressed 624 of 769
+inputs. Each round depends on the previous one, so trajectories diverge whatever
+the temperature. This is D-13 measured rather than argued, and it is why the
+leaderboard reports medians and dispersion and declares ties.
 
 ⚠️ Change any of these and results stop being comparable. They are versioned with the
 prompt hash; a change bumps the scenario version.

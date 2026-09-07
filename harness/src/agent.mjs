@@ -34,6 +34,25 @@ export const INTERFACE = {
   // 8 000 tokens, prompt included, so a larger ceiling makes the request itself
   // unservable (HTTP 413).
   max_tokens: 6000,
+  /**
+   * ⚠️ FIXED AND DECLARED, replacing "provider default".
+   *
+   * The earlier §5 said temperature was the provider's default, "recorded in the
+   * receipt" -- but no provider returns it, so the receipt recorded `null`. A
+   * project that pins solc, the EVM version, optimizer runs, the checker, the
+   * solver and the input vector was leaving free the one parameter that decides
+   * what the model actually says, and could not reproduce its own runs.
+   *
+   * 0.2 is arbitrary, and that is fine: what matters is that it is fixed,
+   * declared, and identical across models. Not 0, because R1 wants seeds to vary
+   * sampling and at 0 they would not.
+   *
+   * ⚠️ This does NOT remove the variance. Four runs of one model on one task gave
+   * +291, +136, +263 and -60 gas/call. Each round depends on the last, so
+   * trajectories diverge even at low temperature -- D-13 stands, and medians with
+   * dispersion are still the only honest way to report.
+   */
+  temperature: 0.2,
   prompt_hash: PROMPT_HASH,
 };
 
@@ -47,7 +66,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * round -- otherwise a busy provider would show up in the results as a model
  * that failed the task.
  */
-async function callModel({ baseUrl, apiKey, model, messages, maxTokens, log, gateway, payments }) {
+async function callModel({ baseUrl, apiKey, model, messages, maxTokens, temperature, seed, log, gateway, payments }) {
   for (let attempt = 1; attempt <= 4; attempt++) {
     let res;
 
@@ -56,7 +75,7 @@ async function callModel({ baseUrl, apiKey, model, messages, maxTokens, log, gat
       // The price comes from the 402 body, never from our own config: a client
       // that decides what to pay is not being gated by anything.
       const url = `${gateway}/v1/chat/completions`;
-      const payload = JSON.stringify({ model, messages, max_tokens: maxTokens });
+      const payload = JSON.stringify({ model, messages, max_tokens: maxTokens, temperature, seed });
       const headers = { 'Content-Type': 'application/json' };
 
       const challenge = await fetch(url, { method: 'POST', headers, body: payload });
@@ -86,7 +105,10 @@ async function callModel({ baseUrl, apiKey, model, messages, maxTokens, log, gat
       res = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages, max_tokens: maxTokens }),
+        // ⚠️ `seed` is best-effort: the API accepts it, but providers batch
+        // requests on shared GPUs and none guarantees bit-identical output.
+        // Recorded as what we SENT, never claimed as what was honoured.
+        body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature, seed }),
       });
     }
 
@@ -134,6 +156,8 @@ export async function runAgent({
   maxRounds = INTERFACE.max_rounds,
   budgetUsd = INTERFACE.budget_usd_per_run,
   maxTokens = INTERFACE.max_tokens,
+  temperature = INTERFACE.temperature,
+  seed = 0,
   baseUrl = process.env.OPENCODE_BASE_URL ?? 'https://opencode.ai/zen/v1',
   apiKey = process.env.OPENCODE_API_KEY,
   log = () => {},
@@ -179,6 +203,8 @@ export async function runAgent({
     model,
     task_hash: sha(taskSource),
     prompt_hash: PROMPT_HASH,
+    temperature,
+    seed,
     toolchain: { ...PINS },
     rounds: [],
     tokens_in: 0,
@@ -193,7 +219,7 @@ export async function runAgent({
   for (let round = 1; round <= maxRounds; round++) {
     let call;
     try {
-      call = await callModel({ baseUrl, apiKey, model: gateway ? `${provider}/${model}` : model, messages, maxTokens, log, gateway, payments: run.payments });
+      call = await callModel({ baseUrl, apiKey, model: gateway ? `${provider}/${model}` : model, messages, maxTokens, temperature, seed, log, gateway, payments: run.payments });
     } catch (e) {
       run.rounds.push({ round, outcome: 'provider_error', detail: e.message });
       run.stop_reason = 'provider_error';

@@ -408,3 +408,57 @@ Remaining honest options, in preference order:
    targets need no restoration; this would retire it.
 
 Option 1 is what the guarantee vocabulary was built for and costs nothing.
+
+---
+
+# Addendum 6 — the first batches, and what pinning temperature did
+
+Placeholder task (unmutated `log256`), scenario `boundary/v1`, 769 inputs,
+n=5 seeds, `temperature 0.2`, `max_rounds 8`, all patches gated through the
+x402 gateway and receipted on HCS.
+
+| | `groq/openai/gpt-oss-120b` | `openrouter/minimax/minimax-m3:free` |
+|---|---|---|
+| produced a patch | **5/5** | 4/5 |
+| gas/call, median | **151** | 46.5 |
+| range | 142 – 263 | 11 – 121 |
+| **max regression, worst** | **0** | **203** |
+| rounds used | 1, 1, 1, 1, 1 | 1, 1, 3, 5, exhausted |
+| cost, total | $0.006123 | **$0.000000** |
+| label | `FORMAL_NO_EXPLICIT_INPUT_BOUND` ×5 | ×4 |
+
+## Pinning temperature was not cosmetic
+
+Before it was fixed, four runs of `gpt-oss-120b` on this task returned
+**+291, +136, +263 and −60** gas per call — the last a *proved-equivalent* patch
+that regressed 624 of 769 inputs. With `temperature 0.2` declared, the same model
+over five seeds gives **142 – 263 and zero regressions**.
+
+⚠️ The interface parameter was load-bearing and was not being measured. §5 said
+temperature was "the provider default, recorded in the receipt", but no provider
+returns it, so the receipt recorded `null` and the runs were not reproducible even
+by us. This is the clearest evidence in the project that **the agent interface is
+the independent variable**, not a configuration detail.
+
+⚠️ It reduces the spread; it does not remove it. 142 vs 263 is still a factor of
+1.85 between seeds of one model on one task. Medians and dispersion stay
+mandatory, and ties stay the normal outcome.
+
+## The free model is the more interesting row
+
+`minimax-m3:free` does roughly a third of the median saving **at zero marginal
+cost**, which is the finding the cost column exists for. But it is also the row
+that needs both columns:
+
+- seed 4 improved the total by 11 gas/call **while regressing one input by 203**.
+  On the total alone that is a win; the mandatory second column is what makes it
+  legible.
+- seed 1 burned all 8 rounds and produced nothing. A leaderboard reporting only
+  successful runs would have hidden a 20% failure rate.
+
+## What these numbers are NOT
+
+⚠️ Every receipt from these batches carries `mutation_refuted: false`. The task is
+the **unmutated placeholder**, so a memorised answer is still a correct answer and
+these are pipeline measurements, not benchmark results. They must never be quoted
+as a comparison of model capability.

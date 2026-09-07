@@ -39,8 +39,9 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
 
     agent: {
       model: spec,
-      seed: null,
-      temperature: null,
+      seed: run.seed,
+      // ⚠️ What we SENT. No provider guarantees it was honoured bit-for-bit.
+      temperature: run.temperature,
       max_rounds: 8,
       rounds_used: run.rounds.length,
       outcomes: run.rounds.map((r) => r.outcome),
@@ -108,6 +109,11 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
       // ⚠️ A dirty tree means the commit hash does not describe what ran.
       dirty,
       patch_sha256: run.patch ? sha256(run.patch.source) : null,
+      // ⚠️ The SOURCE, not only its hash. A receipt that commits to the hash of
+      // a patch nobody can fetch is not verifiable: "anyone can recompute this"
+      // requires that anyone can obtain the thing to recompute. Costs one extra
+      // HCS chunk.
+      patch_source: run.patch?.source ?? null,
     },
 
     timestamp: new Date().toISOString(),
