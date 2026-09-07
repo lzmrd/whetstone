@@ -617,7 +617,7 @@ Final video edit · README with prior art and scope at the top · `AI_USAGE.md` 
 
 Ratchet · procedural mutation engine · cross-family dispersion. All roadmap.
 
-⚠️ **The control family was on this list and one member of it was built after all**, because the schedule allowed it: a cosmetic variant of the same function, which turns *"the mutation probably defeated memorisation"* into a measurement — 99.9% of baseline on the cosmetic control against 13.9% on the semantic mutation, same model and interface ([Addendum 8](spike/DAY1-RESULTS.md)). It is one control, not the family. The hand-written mutation `M` stays: without it there is no anti-memorization defence, and its required refutation (§4) is the only machine-checked part of that defence.
+⚠️ **The control family was on this list and one member of it was built after all**, because the schedule allowed it — and it **falsified the result it was built to test**. With a cost-neutral cosmetic control the semantic mutation and the control are indistinguishable (70.7% against 75.4% of baseline, overlapping ranges): a tie, which D-13 says is the normal outcome at n=5. The earlier claim of 99.9% against 13.9% is **retracted** ([Addendum 9](spike/DAY1-RESULTS.md)). It is one control, not the family. The hand-written mutation `M` stays: without it there is no anti-memorization defence, and its required refutation (§4) is the only machine-checked part of that defence.
 
 ---
 

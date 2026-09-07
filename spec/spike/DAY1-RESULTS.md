@@ -513,6 +513,12 @@ listed as cut from this hackathon's scope.
 
 ---
 
+# Addendum 8 — ⚠️ RETRACTED. See [Addendum 9](#addendum-9--the-control-was-confounded-and-the-finding-does-not-survive-it)
+
+> The heading and text below are left exactly as published. The conclusion is
+> **withdrawn**: the control it rested on was confounded, and with a cost-neutral
+> control the difference disappears into the variance.
+
 # Addendum 8 — the control, and what it settles
 
 Addendum 7 reported that the semantic mutation cost `gpt-oss-120b` most of its
@@ -580,3 +586,90 @@ the effect, not a measurement of how large the effect is in general.
 ⚠️ The control **must never share a leaderboard column with a semantic task**. Its
 receipts carry `mutation_refuted: false`, and 799 gas/call against 40 is not a
 comparison, it is two different questions.
+
+
+---
+
+# Addendum 9 — the control was confounded, and the finding does not survive it
+
+Addendum 8 reported **99.9% of baseline on a cosmetic control against 13.9% on the
+semantic mutation** and concluded that the drop was caused by removing the
+memorised answer. An adversarial audit of that result found two faults, either of
+which is enough to sink it.
+
+## Fault 1 — the control had 2.8× the headroom
+
+The first control rewrote `<< 7` as `* 128` and `>> 3` as `/ 8` and added a helper.
+Cosmetic in *behaviour*, but `mul` and `div` cost 5 gas where `shl` and `shr` cost
+3, so the control task started **59% more expensive** than the semantic task:
+
+| | task | baseline | gap/call |
+|---|---|---|---|
+| semantic | 616 320 | 398 592 | **283** |
+| control, **confounded** | 977 806 | 362 968 | **799** |
+| control, **cost-neutral** | 581 002 | 362 968 | **283** |
+
+"99.9% against 13.9%" compared a large easy win with a small hard one. The
+cost-neutral rewrite changes names and shape only, and its gap now matches the
+semantic task's to within 0.14%.
+
+## Fault 2 — the variance is larger than the effect
+
+Two batches of n=5, **identical task, model and interface**, run hours apart:
+
+```
+batch A   4/5 patched   median  40 gas/call   13.9% of baseline
+batch B   5/5 patched   median 201 gas/call   70.7% of baseline
+```
+
+The number Addendum 8 treated as a measurement moves by a factor of five between
+batches of the same configuration.
+
+## Pooled, with the cost-neutral control
+
+| | runs | gas/call median | range | **vs baseline, median** |
+|---|---|---|---|---|
+| `log256-bytelen/v1` semantic | 7/7 | 201 | −54 … 305 | **70.7%** |
+| `log256-cosmetic-control/v1` | 5/5 | 214 | 11 … 283 | **75.4%** |
+
+Ranges overlap almost entirely. **This is a tie**, which D-13 says is the normal
+outcome at this sample size — *"n=5 gives median and dispersion, not statistical
+power; separating a 2% difference needs roughly 9 runs and 1% about 36"*.
+
+⚠️ Pooling the earlier batch too (11 runs, median 40) moves the semantic median
+back down. The distribution is bimodal and unstable across batches, which is the
+same conclusion by another route: **at this sample size nothing is distinguishable.**
+
+## What is withdrawn, and what is not
+
+**Withdrawn**: that the semantic mutation measurably reduces model performance.
+There is no evidence for it in this data. It may still be true; it is not shown.
+
+**Not withdrawn**: the control did exactly what a control is for. It was built to
+be able to falsify a claim we had already published, and it falsified it within
+the hour. The apparatus — bilateral mutation, both proof obligations, the
+order-neutral instrument, the mandatory regression column, medians over seeds —
+worked. It caught us.
+
+⚠️ The uncomfortable part, recorded because it is the point: **Addendum 8 was
+written, committed and pushed as a finding before its control existed.** The
+project's own rule is that a property established once and assumed is not a
+property. The same discipline applied to results, not just to code, would have
+held that conclusion until the control ran.
+
+## The by-product that turned up while auditing
+
+The task applies `+1` as checked Solidity arithmetic; the baseline applies it
+inside assembly, unchecked. Measured cost of that difference: **52 992 gas over
+768 inputs, 69 gas/call — 24% of the whole gap.**
+
+That is not a defect to remove. It is **the price of the semantics solady drops**,
+the D-04 by-product thought lost when `mulDiv` returned `UNKNOWN` — and here it is
+measurable, on a target where both sides are *proved equivalent*. But it must be
+**published as a decomposition** rather than left invisible inside the gap:
+
+```
+283 gas/call total gap
+ ├─  69  checked vs unchecked arithmetic   (the price of the dropped semantics)
+ └─ 214  the algorithm
+```
