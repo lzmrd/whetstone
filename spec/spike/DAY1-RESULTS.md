@@ -188,3 +188,45 @@ real headroom for the agent to contend for.
 
 ⚠️ `toHexString` rows carry `FUZZED`, never `FORMAL`. That is the point, not a
 concession.
+
+---
+
+# Addendum 3 — exhaustive fixtures halved the headroom
+
+`Scenario.inputs()` — 0, every `2**k` and `2**k ± 1` for k = 0..255, and
+`type(uint256).max`. **769 inputs**, measured in seconds.
+
+| Target | 10 fixtures | **769 boundary** | OZ spread (max−min) |
+|---|---|---|---|
+| `log2` | 51 | **18** | 46 |
+| `log256` | 66 | **32** | 81 |
+| `toHexString` | 4 833 | **7 596** | 15 994 |
+
+⚠️ **The sparse fixture set overstated the gap by roughly 2×** on both log targets.
+Fixture-overfitting was already biting our own baseline measurement, before any
+model patch existed. This is the strongest argument in the project for the
+scenario being a first-class artifact rather than a footnote.
+
+⚠️ **On `log256` the input-dependent spread (81 gas) exceeds the mean saving (32).**
+Not noise — gas is deterministic per input, so a fixed scenario gives an exact,
+comparable total. But it means a patch can improve some inputs and worsen others
+and net out ambiguously, so **report the total over the fixed scenario plus
+min/max/spread**, never a bare mean.
+
+## Admission rule, pre-declared
+
+> A target enters the leaderboard only if its **total gap over `boundary/v1`**
+> is large enough that one gas is a meaningful fraction of it. Primary metric is
+> **absolute gas over the fixed scenario**; percentage is derived and secondary.
+
+Applied to measurement rather than to preference:
+
+| Target | Total gap over 769 inputs | Role |
+|---|---|---|
+| `toHexString` | **5 841 982** | headroom target — `FUZZED` |
+| `log256` | 25 237 | formal target — `FORMAL_NO_EXPLICIT_INPUT_BOUND` |
+| `log2` | 14 446 | dropped: strictly worse than log256 on both axes |
+
+**Final pairing: `log256` (FORMAL, exact, small) + `toHexString` (FUZZED, large).**
+Two targets, two labels, the leaderboard saying which is which — a guarantee
+vocabulary that only ever prints one label is decoration.

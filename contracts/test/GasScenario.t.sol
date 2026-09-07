@@ -2,87 +2,50 @@
 pragma solidity 0.8.35;
 
 import {Test, console} from "forge-std/Test.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {FixedPointMathLib as S} from "solady/utils/FixedPointMathLib.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {LibString} from "solady/utils/LibString.sol";
+import {Scenario} from "./Scenario.sol";
 
-/// Gas is not a single number for a pure function: it depends on the input.
-/// A score quoted without its fixture set is undefined, and invites cherry-picking.
-/// SCENARIO_ID is versioned and goes into the receipt.
-contract GasScenario is Test {
-    string constant SCENARIO_ID = "logs/v1";
+interface IU { function f(uint256 x) external pure returns (uint256); }
+interface IS { function f(uint256 x) external pure returns (string memory); }
 
-    function _fixtures() internal pure returns (uint256[10] memory f) {
-        f = [
-            uint256(1), 2, 3, 255, 256,
-            65535, 2 ** 64, 2 ** 128 - 1, 2 ** 255, type(uint256).max
-        ];
-    }
+/// Gas measured through an EXTERNAL call to the deployed wrapper — the same
+/// artifact hevm proves equivalence on.
+///
+/// ⚠️ gasleft() around *inlined internal* calls is NOT stable: the log256
+/// figure moved 27 -> 39 gas/call purely because unrelated imports were added
+/// to the test file. Call overhead is constant here and cancels in the delta.
+contract GasScenarioTest is Test {
+    struct R { uint256 total; uint256 min; uint256 max; uint256 reverts; }
 
-    function test_toString_gas_across_scenario() public view {
-        uint256[10] memory f = _fixtures();
-        uint256 ozTotal; uint256 sdTotal;
-        for (uint256 i = 0; i < f.length; i++) {
-            uint256 g0 = gasleft(); Strings.toString(f[i]); uint256 oz = g0 - gasleft();
-            g0 = gasleft(); LibString.toString(f[i]); uint256 sd = g0 - gasleft();
-            ozTotal += oz; sdTotal += sd;
-        }
-        console.log("toString TOTAL:", ozTotal, sdTotal);
-        console.log("  PER CALL saved:", (ozTotal - sdTotal) / f.length);
-    }
-
-    function test_toHex_gas_across_scenario() public view {
-        uint256[10] memory f = _fixtures();
-        uint256 ozTotal; uint256 sdTotal;
-        for (uint256 i = 0; i < f.length; i++) {
-            uint256 g0 = gasleft(); Strings.toHexString(f[i]); uint256 oz = g0 - gasleft();
-            g0 = gasleft(); LibString.toHexString(f[i]); uint256 sd = g0 - gasleft();
-            ozTotal += oz; sdTotal += sd;
-        }
-        console.log("toHex TOTAL:", ozTotal, sdTotal);
-        console.log("  PER CALL saved:", (ozTotal - sdTotal) / f.length);
-    }
-
-    function test_log256_gas_across_scenario() public view {
-        uint256[10] memory f = _fixtures();
-        uint256 ozTotal;
-        uint256 sdTotal;
-        for (uint256 i = 0; i < f.length; i++) {
+    function _measure(address a, bool dyn) internal view returns (R memory r) {
+        uint256[] memory xs = Scenario.inputs();
+        r.min = type(uint256).max;
+        for (uint256 i = 0; i < xs.length; i++) {
+            bytes memory cd = abi.encodeWithSelector(dyn ? IS.f.selector : IU.f.selector, xs[i]);
             uint256 g0 = gasleft();
-            Math.log256(f[i]);
-            uint256 oz = g0 - gasleft();
-            g0 = gasleft();
-            S.log256(f[i]);
-            uint256 sd = g0 - gasleft();
-            ozTotal += oz; sdTotal += sd;
+            (bool ok,) = a.staticcall(cd);
+            uint256 used = g0 - gasleft();
+            if (!ok) { r.reverts++; continue; }
+            r.total += used;
+            if (used < r.min) r.min = used;
+            if (used > r.max) r.max = used;
         }
-        console.log("log256 TOTAL over", f.length, "fixtures:");
-        console.log("  oz", ozTotal, "solady", sdTotal);
-        console.log("  PER CALL saved:", (ozTotal - sdTotal) / f.length);
     }
 
-    function test_log2_gas_across_scenario() public view {
-        uint256[10] memory f = _fixtures();
-        uint256 ozTotal;
-        uint256 sdTotal;
-        console.log("scenario:", SCENARIO_ID);
-        console.log("input_index | oz_gas | solady_gas | delta");
-        for (uint256 i = 0; i < f.length; i++) {
-            uint256 g0 = gasleft();
-            Math.log2(f[i]);
-            uint256 oz = g0 - gasleft();
+    function _report(string memory name, string memory ozArt, string memory sdArt, bool dyn) internal {
+        R memory a = _measure(deployCode(ozArt), dyn);
+        R memory b = _measure(deployCode(sdArt), dyn);
+        uint256 n = Scenario.inputs().length - a.reverts;
+        console.log("--", name);
+        console.log("   oz total/min/max:", a.total, a.min, a.max);
+        console.log("   sd total/min/max:", b.total, b.min, b.max);
+        console.log("   per-call saved:", (a.total - b.total) / n);
+        console.log("   oz spread (max-min):", a.max - a.min);
+    }
 
-            g0 = gasleft();
-            S.log2(f[i]);
-            uint256 sd = g0 - gasleft();
-
-            ozTotal += oz;
-            sdTotal += sd;
-            console.log(i, oz, sd);
-        }
-        console.log("log2 TOTAL over", f.length, "fixtures:");
-        console.log("  oz", ozTotal, "solady", sdTotal);
-        console.log("  PER CALL saved:", (ozTotal - sdTotal) / f.length);
+    function test_scenario_boundary_v1() public {
+        console.log("scenario:", Scenario.ID, "| inputs:", Scenario.inputs().length);
+        _report("log2",    "OzLog2",     "SdLog2",     false);
+        _report("log256",  "OzLog256",   "SdLog256",   false);
+        _report("toHex",   "OzToHex",    "SdToHex",    true);
     }
 }
