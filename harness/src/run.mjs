@@ -8,31 +8,32 @@
  * rests on -- can a model return a patch we can compile and prove?
  */
 
-import { readFileSync } from 'node:fs';
 import { runAgent, INTERFACE } from './agent.mjs';
 import { checkerVersion } from './equivalence.mjs';
+import { resolve, TABLE_HASH } from './providers.mjs';
 
-const [, , model, taskPath = '../contracts/src/tasks/Task.sol'] = process.argv;
-if (!model) {
-  console.error('\nusage: npm run agent -- <model-id> [task.sol]\n');
+const [, , spec, taskPath = '../contracts/src/tasks/Task.sol'] = process.argv;
+if (!spec) {
+  console.error('\nusage: npm run agent -- <provider/model> [task.sol]\n');
   process.exit(1);
 }
 
-const table = JSON.parse(readFileSync(new URL('./prices.json', import.meta.url), 'utf8'));
-const price = table.prices[model];
-if (!price) {
-  console.error(`\n✗ No pinned price for "${model}".`);
-  console.error('  A model that cannot be metered must not appear in the leaderboard.');
-  console.error(`  Transcribe its price from ${table._source} into prices.json.\n`);
+let target;
+try {
+  target = resolve(spec);
+} catch (e) {
+  console.error(`\n✗ ${e.message}\n`);
   process.exit(1);
 }
+const { model, price, baseUrl, apiKey } = target;
 
 const pad = (s, n) => String(s).padEnd(n);
 console.log(`
-model        ${model}   ($${price.input} / $${price.output} per 1M)
+model        ${spec}   ($${price.input} / $${price.output} per 1M list)
 task         ${taskPath}
 interface    max_rounds=${INTERFACE.max_rounds}  budget=$${INTERFACE.budget_usd_per_run}  prompt=${INTERFACE.prompt_hash.slice(0, 12)}
 checker      ${await checkerVersion()}
+prices       v${(await import('./providers.mjs')).TABLE._version}  sha256:${TABLE_HASH.slice(0, 12)}
 `);
 
 const t0 = Date.now();
@@ -40,6 +41,8 @@ const run = await runAgent({
   model,
   taskPath,
   price,
+  baseUrl,
+  apiKey,
   log: (round, outcome, detail) =>
     console.log(`  round ${round}  ${pad(outcome, 9)} ${detail ?? ''}`),
 });

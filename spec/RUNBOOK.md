@@ -19,7 +19,7 @@ One page. No new concepts: everything is extracted from [WHETSTONE.md](WHETSTONE
 | `optimizer_runs` | **`200`**, `optimizer = true` — OZ's own setting | ✅ set |
 | Checker | hevm \| halmos | **decided Monday from the spike** |
 | Cost denomination | HBAR paid; USD shown at a **declared rate + date** | ✅ set |
-| Model source | **OpenCode Zen / Go** — one OpenAI-compatible key, ~24 open-weight models | ✅ set |
+| Model source | ⚠️ **OpenCode Zen is BLOCKED** (GATE 0). Replaced by a provider **registry**: `harness/src/prices.json` holds base URL, key env var, price source and pinned prices per provider. Candidates: **Groq** (Llama, Qwen, Gemma, Mixtral) and **OpenRouter** (`:free` variants) — both open-weight-only and OpenAI-compatible, so no harness change beyond a key and transcribed prices | ⚠️ keys needed |
 | Models under test | 2 paid (e.g. `minimax-m3`, $0.30/$1.20 per 1M) + 1 free (e.g. `mimo-v2.5-free`) | 🔴 **confirm ids from your dashboard** |
 | Total demo budget | **$3** at list price — estimate below shows ~$1.20 needed | ✅ set |
 
@@ -40,6 +40,7 @@ One page. No new concepts: everything is extracted from [WHETSTONE.md](WHETSTONE
 
 - Use them **today for building and debugging the harness** — no measurement runs are due until the batch
 - Keeping **one free model in the leaderboard alongside the paid ones makes the cost column more interesting**, not less: *"this model did 40% of the work at zero marginal cost"* is a real finding
+- ⚠️ **Two providers, not one, and not for redundancy alone.** R10 commits the allocator to *"budgeting across providers"*; with a single provider that phrase has nothing behind it, and the demo beat is theatre. GATE 0 also showed what a single point of failure costs: the one provider we had refuses API access outright
 - ⚠️ **Runtime price fetching is impossible — verified, not assumed.** `GET /v1/models` returns only `id`, `object`, `created`, `owned_by`: **no pricing at all**. Prices therefore live in `harness/src/prices.json`, pinned by hand with source URL, retrieval date, version and sha256, and the hash goes into the receipt. A model with no price entry **cannot be metered and must not appear in the leaderboard**
 
 ⚠️ **`osaka` may outrun the tools.** Symbolic execution engines lag behind hardforks. If hevm/halmos do not support `osaka` on Monday, drop to `cancun` and **declare the divergence from OZ's own config** in the receipt. This is a day-1 spike item, not a config detail.

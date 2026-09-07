@@ -1,23 +1,83 @@
 {
-  "_comment": "Pinned price table. The OpenCode Zen /v1/models endpoint returns no pricing (only id, object, created, owned_by), so runtime fetching is not possible and prices are pinned here instead. Every receipt records this file's version and hash, so anyone can check these figures against the source URL below.",
-  "_source": "https://opencode.ai/docs/zen/",
-  "_retrieved": "2026-09-06",
+  "_comment": "Provider registry and pinned price table. Prices are NOT fetchable at runtime: the endpoints return no pricing, so every figure here is transcribed by hand from the provider's published page, with that URL and the retrieval date recorded. Every receipt carries this file's version and sha256.",
   "_unit": "USD per 1M tokens",
-  "_version": 1,
-
-  "prices": {
-    "minimax-m3":                      { "input": 0.30, "output": 1.20, "cached_read": 0.06 },
-    "minimax-m2.7":                    { "input": 0.30, "output": 1.20, "cached_read": 0.06 },
-    "minimax-m2.5":                    { "input": 0.30, "output": 1.20, "cached_read": 0.06 },
-
-    "big-pickle":                      { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
-    "mimo-v2.5-free":                  { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
-    "ling-3.0-flash-fin-free":         { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
-    "nemotron-3-ultra-free":           { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
-    "nemotron-3.5-lightning-free":     { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
-    "muse-spark-1.3-contributor-free": { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
-    "deepseek-v4-flash-free":          { "input": 0.0, "output": 0.0, "cached_read": 0.0 }
-  },
-
-  "_todo": "Add the paid models actually used in the measured batch, transcribed from the source URL on the date recorded above. A model with no entry here cannot be metered and must not appear in the leaderboard."
+  "_version": 2,
+  "_rule": "A model with no entry here cannot be metered and MUST NOT appear in the leaderboard. usd_list is 'what this would cost anyone' at published list price -- it is NOT what we paid. A call served by a free tier still reports the published list price, and the actual spend of zero is a separate fact.",
+  "providers": {
+    "opencode": {
+      "base_url": "https://opencode.ai/zen/v1",
+      "key_env": "OPENCODE_API_KEY",
+      "source": "https://opencode.ai/docs/zen/",
+      "retrieved": "2026-09-06",
+      "status": "BLOCKED \u2014 GATE 0, 7 Sep: free tier is client-only and the API refuses it; paid models report an empty balance",
+      "models": {
+        "minimax-m3": {
+          "input": 0.3,
+          "output": 1.2,
+          "cached_read": 0.06
+        },
+        "minimax-m2.7": {
+          "input": 0.3,
+          "output": 1.2,
+          "cached_read": 0.06
+        },
+        "minimax-m2.5": {
+          "input": 0.3,
+          "output": 1.2,
+          "cached_read": 0.06
+        },
+        "big-pickle": {
+          "input": 0.0,
+          "output": 0.0,
+          "cached_read": 0.0
+        },
+        "mimo-v2.5-free": {
+          "input": 0.0,
+          "output": 0.0,
+          "cached_read": 0.0
+        },
+        "ling-3.0-flash-fin-free": {
+          "input": 0.0,
+          "output": 0.0,
+          "cached_read": 0.0
+        },
+        "nemotron-3-ultra-free": {
+          "input": 0.0,
+          "output": 0.0,
+          "cached_read": 0.0
+        },
+        "nemotron-3.5-lightning-free": {
+          "input": 0.0,
+          "output": 0.0,
+          "cached_read": 0.0
+        },
+        "muse-spark-1.3-contributor-free": {
+          "input": 0.0,
+          "output": 0.0,
+          "cached_read": 0.0
+        },
+        "deepseek-v4-flash-free": {
+          "input": 0.0,
+          "output": 0.0,
+          "cached_read": 0.0
+        }
+      }
+    },
+    "groq": {
+      "base_url": "https://api.groq.com/openai/v1",
+      "key_env": "GROQ_API_KEY",
+      "source": "https://groq.com/pricing/",
+      "retrieved": null,
+      "status": "CANDIDATE \u2014 open-weight only (Llama, Qwen, Gemma, Mixtral), OpenAI-compatible",
+      "models": {}
+    },
+    "openrouter": {
+      "base_url": "https://openrouter.ai/api/v1",
+      "key_env": "OPENROUTER_API_KEY",
+      "source": "https://openrouter.ai/models",
+      "retrieved": null,
+      "status": "CANDIDATE \u2014 many open-weight models carry a :free variant; availability rotates, so probe before every batch",
+      "models": {}
+    }
+  }
 }

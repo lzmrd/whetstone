@@ -15,15 +15,7 @@
  * Run:  cd harness && npm run access
  */
 
-import { readFileSync } from 'node:fs';
-
-const { OPENCODE_API_KEY, OPENCODE_BASE_URL = 'https://opencode.ai/zen/v1' } = process.env;
-if (!OPENCODE_API_KEY) {
-  console.error('\n✗ OPENCODE_API_KEY is not set in .env\n');
-  process.exit(1);
-}
-
-const table = JSON.parse(readFileSync(new URL('./prices.json', import.meta.url), 'utf8'));
+import { TABLE, allPriced } from './providers.mjs';
 
 function classify(status, body) {
   if (/free tier can only be used in OpenCode/.test(body)) return ['FREE-TIER GATED', 'API blocked; client-only'];
@@ -33,15 +25,22 @@ function classify(status, body) {
 }
 
 let usable = 0;
-console.log(`\nProbing ${Object.keys(table.prices).length} priced models at ${OPENCODE_BASE_URL}\n`);
+const targets = allPriced();
+console.log(`\nProbing ${targets.length} priced model(s) across ${Object.keys(TABLE.providers).length} provider(s)\n`);
 
-for (const [id, price] of Object.entries(table.prices)) {
+for (const { spec, price, cfg } of targets) {
   const kind = price.input === 0 && price.output === 0 ? 'free' : 'paid';
+  const id = spec.slice(spec.indexOf('/') + 1);
+  const apiKey = process.env[cfg.key_env];
+  if (!apiKey) {
+    console.log(`  ${spec.padEnd(40)} ${kind.padEnd(5)} ${'NO KEY'.padEnd(16)} set ${cfg.key_env} in .env`);
+    continue;
+  }
   let tag, note = '';
   try {
-    const res = await fetch(`${OPENCODE_BASE_URL}/chat/completions`, {
+    const res = await fetch(`${cfg.base_url}/chat/completions`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${OPENCODE_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: id, messages: [{ role: 'user', content: 'say ok' }], max_tokens: 5 }),
     });
     if (res.ok) {
@@ -56,7 +55,7 @@ for (const [id, price] of Object.entries(table.prices)) {
   } catch (e) {
     [tag, note] = ['NETWORK', e.message.slice(0, 60)];
   }
-  console.log(`  ${id.padEnd(32)} ${kind.padEnd(5)} ${tag.padEnd(16)} ${note}`);
+  console.log(`  ${spec.padEnd(40)} ${kind.padEnd(5)} ${tag.padEnd(16)} ${note}`);
 }
 
 console.log(`\n${usable} model(s) usable and meterable.`);
