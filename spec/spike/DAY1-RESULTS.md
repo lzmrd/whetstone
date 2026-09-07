@@ -314,3 +314,78 @@ wrong in the submission would be worse than getting it wrong here:
   in WHETSTONE §1 and is about absolute gas being primary and percentage derived.
 - `log256` was never coarser than `log2`. At 32 gas one gas was 3.1%; at `log2`'s
   18 it was 5.6%. `log256` was and remains the finer instrument of the two.
+
+---
+
+# Addendum 5 — the `mulDiv` second pass, and what it returned
+
+Day 1 left `mulDiv` as a counterexample: OpenZeppelin raises `Panic(0x12)`,
+solady raises `FullMulDivFailed()`. Sound, but half an answer — it establishes
+that the *revert reasons* differ and says nothing about whether the arithmetic
+agrees. Reporting only that would be selling a counterexample as an analysis.
+
+## The wrapper
+
+[`MulDivConditional.sol`](../../contracts/src/spike/MulDivConditional.sol) asks
+the question the counterexample does not:
+
+> assuming `d != 0` and the 512-bit product `x*y` fits in `d`,
+> do `Math.mulDiv` and `FixedPointMathLib.fullMulDiv` return the same value?
+
+Two design points, both of which the obvious implementation gets wrong:
+
+**Normalise the payload, keep the flag.** The natural phrasing is "a wrapper that
+normalises `(success, returndata)`". Normalising the *success flag* as well would
+be unsound: if one implementation reverted where the other returned a value, the
+normalisation would hide a genuine divergence rather than isolate the revert
+reason. The wrapper returns `(bool ok, uint256 v)` with `v = 0` when `ok` is
+false, so a domain disagreement still surfaces as `(false, 0)` against
+`(true, x)`.
+
+**No `try/catch`.** Catching a revert requires an external call, which puts an
+address hevm has no code for into the symbolic state. The guard is evaluated
+inline instead, byte-identical on both sides, so both wrappers succeed on exactly
+the same inputs by construction and the wrapper stays a single self-contained
+runtime object.
+
+## Result: `UNKNOWN`
+
+```
+hevm 0.58.0, bitwuzla, --max-iterations -1, --smt-timeout 900
+[FAIL] Contracts may not behave equivalently
+[WARNING] partially explored: 2x -> SMT solver says: Unable to parse SMT solver
+          output (maybe it got killed?): terminate called after throwing an
+          instance of 'std::bad_alloc'
+```
+
+**No counterexample. No proof.** The solver ran out of memory, as z3 did on the
+unconditional form. Conditioning the domain did not rescue tractability: solady's
+`fullMulDiv` performs a 512-bit division by Newton–Raphson inverse, and that is
+what exhausts the solver, not the revert paths the guard removes.
+
+⚠️ **`UNKNOWN` is not evidence of equivalence.** It is the label that exists so
+that a solver timeout cannot be quietly written up as a pass — and this is the
+first time in the project a target has earned it, which is the point of having a
+four-label vocabulary rather than a boolean.
+
+## What this costs, stated plainly
+
+The by-product number promised in D-04 — *"the price of the semantics solady
+dropped"* — was to come from `mulDiv`, the one chosen target where the semantics
+genuinely differ. It cannot be published as a verified quantity, because the
+arithmetic underneath it is unproven. A gas delta between two implementations
+that have **not** been shown to compute the same thing is not a price, it is a
+comparison of two different functions.
+
+Remaining honest options, in preference order:
+
+1. Publish the `mulDiv` gas delta explicitly labelled `UNKNOWN`, next to the
+   counterexample, as a *measured* number with an *unproven* precondition.
+2. Narrow the domain further — to products that fit in 256 bits, where `mulDiv`
+   reduces to `(x*y)/d` — and see whether the solver survives. A weaker claim,
+   but a complete one. **Not attempted yet**: it needs the machine to itself, and
+   the `toHexString` attempt currently holds 11 GB.
+3. Drop the by-product. It was already weakened when day 1 showed the chosen
+   targets need no restoration; this would retire it.
+
+Option 1 is what the guarantee vocabulary was built for and costs nothing.
