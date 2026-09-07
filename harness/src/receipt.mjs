@@ -86,6 +86,11 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
           label: run.patch.label,
           bounds: { max_iterations: -1, max_input_len: null },
           assumptions: [],
+          // ⚠️ §7: FUZZED must carry "campaigns, seeds, corpus, ranges, and what
+          // was compared". Without it the label asserts nothing -- 20 000 runs
+          // and 20 runs would print identically. Null on a FORMAL_* label, where
+          // the proof, not a campaign, is the evidence.
+          fuzz_campaign: run.patch.label === 'FUZZED' ? (run.fuzz_campaign ?? null) : null,
           reverts_covered: true,
           // Verified per run by task.mjs, not asserted: hevm must REFUTE
           // task == original, or prepareTask throws and nothing is scored.

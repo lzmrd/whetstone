@@ -151,6 +151,8 @@ writeFileSync(outFile, JSON.stringify({
     relative_progress_median: rel.length ? median(rel) : null,
     usd_list: { median: median(costs), total: costs.reduce((a, b) => a + b, 0) },
     labels: [...new Set(ok.map((r) => r.label))],
+    // Non-null only when some run actually earned FUZZED.
+    fuzz_campaign: ok.find((r) => r.label === 'FUZZED')?.run?.fuzz_campaign ?? null,
     // ⚠️ Carried explicitly so a consumer cannot summarise it away.
     spread_crosses_zero: Math.min(...saved) < 0 && Math.max(...saved) > 0,
   },
