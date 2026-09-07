@@ -264,7 +264,7 @@ GATE 4 — gas(solady_M) >= gas(OZ_M)   [the mutation damaged the baseline]
 | **Mon 7** | A `proven`/`fail`/`unknown` outcome on **one** function + proceed/pivot decision |
 | **Tue 8** | **One complete leaderboard row**: mutated variant, proven baseline, paid x402 call, HCS receipt |
 | **Wed 9** | Subgraph queried by the allocator to decide the next round |
-| **Thu 10** | Multi-seed batch, web view, **feature freeze 18:00**, video recorded |
+| **Thu 10** | Multi-seed batch, web view, **feature freeze 18:00**, video recorded. Stretch only, 90-minute abort: the historical-pair task (WHETSTONE §13) |
 | **Fri 11 am** | Submission closed. **No code.** |
 
 > **Tue 8 is the point of no return**: from there on something exists to present even if everything else collapses.

@@ -306,6 +306,23 @@ The aggregation policy is declared **beforehand**: median gas, median cost, best
 
 ⚠️ **Task independence is not free.** Many commits come from the same repo, author or technique: 200 tasks may be worth far less than 200 independent observations. Group by repository and technique family, with **clustered intervals**, or their width is fiction.
 
+### A single historical pair is not Track H
+
+⚠️ Worth stating because the shortcut is tempting: taking one old optimization
+commit and calling it "the mined track" would be wrong. Track H's anti-contamination
+defence is **post-cutoff freshness**, not the fact that a task came from history.
+An old commit is memorised by construction, so used alone it measures recall.
+
+There is a legitimate use for one, and it is on the Thursday stretch list
+([WHETSTONE §13](WHETSTONE.md)): run a contaminated historical pair *alongside* an
+uncontaminated mutated task, and report the **gap between the two scores as an
+estimate of contamination**. That is a measurement, not a task — and it is the
+only place in the hackathon build where the project's founding question gets a
+number attached to it.
+
+It still never shares a leaderboard column with Track S results, and it carries a
+`CONTAMINATED` label wherever it appears.
+
 ### What Track S hands to Track H
 
 Not "what survives": Track S remains valid as an experimental track in its own right. This table says what gets **reused**.

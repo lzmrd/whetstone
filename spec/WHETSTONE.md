@@ -558,7 +558,46 @@ Hand-written mutation `M` on both sides · proof 1 passes, proof 2 refutes (§4)
 **Thursday 10 — freeze at 18:00, then record**
 Morning: multi-seed batch, then minimal web view (judged criterion)
 Afternoon: **feature freeze**, then record the 2-4 min video — **the five beats in §11 are build requirements, check them before freezing**
-Only if all of the above is done: second function, or the Uniswap deliverable
+Only if all of the above is done: the **historical-pair task** below, or the Uniswap deliverable
+
+#### Stretch candidate — a real historical commit, and the contamination it measures
+
+OpenZeppelin's changelog carries `Math: optimize log256 rounding check` (**PR #3745**):
+a real, merged, human gas optimization **on the target function we already proved
+tractable**. Before and after both exist and are public.
+
+⚠️ **It is contaminated, and that is the point.** A 2023 commit in OpenZeppelin is
+in every model's training data, so a model can reproduce the merged patch from
+memory. Run alone it would measure recall, not capability. Run *beside* the
+mutated task it measures something no other task in this project can:
+
+| Task | Contaminated | Measures |
+|---|---|---|
+| `log256` + mutation `M` | no | capability |
+| `log256` at PR #3745 | **yes, declared** | capability **+ recall** |
+
+**The gap between the two scores is an estimate of contamination** — which is the
+question the whole project came from. It is a *result*, not merely a second row.
+
+**This is a preview of Track H, not Track H.** Track H's defence is post-cutoff
+freshness; this pair has none, so it never enters a leaderboard column with
+Track S tasks and is labelled `CONTAMINATED` wherever it appears.
+
+**Verify before committing to it** — the day-1 trilemma killed five of seven
+candidates, and this one is unmeasured:
+
+1. Reconstruct the pre-#3745 state (vendored release tarball, as `lib/` already does)
+2. Measure the gas delta over `boundary/v1`. ⚠️ **Abort if it is small** — a
+   rounding-check optimization may be worth a handful of gas, and the target
+   would fail the same scoring rule as any other
+3. Confirm `hevm(before ≡ after)` terminates. The base `log256` is tractable; the
+   two-argument rounding variant is **assumed** tractable, not shown
+4. Leakage defences even for one hand-picked task: strip the commit message, PR
+   title and description from anything the agent sees
+
+**Abort condition**: if 1-3 are not all green in ninety minutes, drop it. It is a
+Thursday stretch item, and Thursday's real deliverable is the frozen build and
+the recorded video.
 
 **Friday 11, morning — submission only. No code.**
 Final video edit · README with prior art and scope at the top · `AI_USAGE.md` · submission form · partner prizes selected · Start Fresh registration
