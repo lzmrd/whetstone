@@ -178,6 +178,36 @@ punish a model.
 | R11 | **Write order per round: HCS first, then Base Sepolia.** The HCS sequence number is needed to build the pointer. The harness keeps a local log as the source of truth and retries a failed registry write |
 | R12 | **`scripts/selfcheck.sh` gates every measured run.** It asserts, in both directions, that hevm still compares revert payloads (negative) and can still prove a real equivalence (positive), and that the gas instrument is order-neutral. A failing self-check means no run is scored or published |
 | R13 | **The checker version is part of the claim, not metadata.** `hevm 0.58.0` is pinned and written into every receipt, because the revert-payload behaviour the whole gate depends on is **undocumented** and can change between releases without notice |
+| R14 | **The red-team pool and the models-under-test pool are disjoint.** A model used to critique the specification, and above all to attack the mutation `M`, must not appear on the leaderboard — or the overlap is declared on its row. See below |
+
+---
+
+### R14 — why the red-team pool must stay separate
+
+Four models (GPT Luna, GLM 5.3, Kimi K3, Qwen 3.8) were used for adversarial
+review of this specification, and at least one of them — `kimi-k3` — is reachable
+through the same gateway that serves the models under test.
+
+⚠️ **R1 already makes the task public**, so "a model saw the target function" is
+not by itself disqualifying: it is the declared price of tractability. The concern
+is narrower and sharper.
+
+Asking a model to **attack `M`** is asking it to reason about how a memorized
+answer could survive the mutation. On consumer and free tiers, submitted
+conversations are commonly retained for training. If such a conversation enters
+the training data of a model that is later scored, the model gains exactly the
+advantage the mutation exists to remove — and it arrives through the one channel
+[D-05](DECISIONS.md) cannot defend, because D-05 defends against *pre-existing*
+training data, not data we contribute ourselves after the fact.
+
+There is also a plainer problem that holds even if no training occurs: a judge
+who sees "Kimi K3 helped design the benchmark" beside "Kimi K3 tops the
+leaderboard" will ask, and will be right to.
+
+**The rule**: red-team `M` with a model that will never be scored. Claude is used
+for implementation and is not on the open-weight leaderboard, so it is available
+for that role. If an overlap is unavoidable, it is declared on the leaderboard
+row rather than left for someone to notice.
 
 ---
 

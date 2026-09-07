@@ -10,10 +10,30 @@ Per ETHGlobal's *Use of AI Tools* rules: attribution, involvement, and spec-driv
 
 | Tool | Used for |
 |---|---|
-| Claude (Claude Code) | Design conversation, specification drafting, research on prior art and sponsor requirements, code assistance |
-| _(to confirm)_ | Adversarial review of the specification — see note below |
+| Claude (Claude Code) | Design conversation, specification drafting, research on prior art and sponsor requirements, implementation |
+| GPT Luna | Adversarial review of the specification |
+| GLM 5.3 | Adversarial review of the specification |
+| Kimi K3 | Adversarial review of the specification |
+| Qwen 3.8 | Adversarial review of the specification |
 
-> ⚠️ **To fill in before submission**: several structured critiques of the specification were incorporated during design. If any of them were produced by another AI model, that must be named here — the attribution rule covers all AI involvement, not only code generation.
+### The adversarial review loop
+
+Structured critiques of the specification were commissioned from **four separate
+models**, deliberately, to find reasoning faults that the drafting model would not
+find in its own work. They are named here because ETHGlobal's attribution rule
+covers **all AI involvement, not only the tool that wrote the code** — and the
+critiques were not marginal. They produced the Track S / Track H split, the
+target trilemma, the agent-interface section, the bilateral mutation, the scoring
+rule with its max-regression column, and the `mulDiv` second pass.
+
+⚠️ **The critiques were not uniformly correct, and that is recorded rather than
+smoothed over.** The 7 September review asserted that the pre-declared admission
+rule required a gap of ≥ 100 gas and was therefore violated by the formal target,
+and that `log256` was a coarser instrument than `log2`. Both are false: no such
+threshold ever existed in the specification, and at 32 gas one gas is 3.1% against
+`log2`'s 5.6%. The surviving points of that same review were accepted and are in
+the repository. Adversarial review is useful **because** it is checked, not
+because it is trusted.
 
 ---
 

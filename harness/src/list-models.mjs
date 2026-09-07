@@ -66,7 +66,11 @@ for (let i = 0; i < unpriced.length; i += 4) {
 
 console.log(`
 Next: pick your models and set them in .env, e.g.
-  MODELS=deepseek-v4-flash-free,minimax-m3,kimi-k3
+  MODELS=deepseek-v4-flash-free,minimax-m3,minimax-m2.7
+
+⚠️ R14: do NOT list a model that was used to red-team the mutation M.
+   GPT Luna, GLM 5.3, Kimi K3 and Qwen 3.8 reviewed the specification;
+   a model asked how to defeat M must not then be scored against it.
 
 Then run 'npm run model:smoke' — it will show an HTTP error for any model
 your plan does not actually cover, and confirm token usage is returned.
