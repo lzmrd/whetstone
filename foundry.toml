@@ -25,10 +25,19 @@ bytecode_hash = 'none'
 # never /tmp, which would grant every test read access to the whole machine.
 fs_permissions = [{ access = 'read', path = './.run' }]
 
-# Differential fuzzing gate (level 2)
+# Gate 2 — differential fuzzing.
+#
+# ⚠️ Pinned, because FUZZED means nothing without the campaign that produced it:
+# §7 requires "campaigns, seeds, corpus, ranges, and what was compared". A fixed
+# seed also makes any divergence reproducible by a third party rather than a
+# story about something we once saw.
+#
+# ⚠️ These values ARE the label. Changing runs or seed changes what FUZZED
+# asserts, so they are serialized into every receipt alongside it.
 [profile.default.fuzz]
-runs = 1024                # raise to 1_000_000 for the recorded batch
-seed = '0x1'               # pinned; the seed goes into the receipt
+runs = 20000
+seed = '0x7768657473746f6e65'   # "whetstone" — pinned, recorded in the receipt
+max_test_rejects = 100000
 
 [profile.ci]
 fuzz = { runs = 100_000 }
