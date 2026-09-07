@@ -19,6 +19,7 @@ import { compileToRuntime, PINS } from './compile.mjs';
 import { equivalent, counterexampleFor } from './equivalence.mjs';
 import { measurePatch } from './gas.mjs';
 import { signPayment } from './pay.mjs';
+import { differential, fuzzCampaign } from './differential.mjs';
 
 /** §5: identical across all models and seeds. Changing one breaks comparability. */
 export const INTERFACE = {
@@ -265,6 +266,18 @@ export async function runAgent({
         // ── gate 3: does it still do the same thing? ────────────────────
         const eq = await equivalent(built.path, taskBuild.path, sig);
         if (eq.equivalent === true) {
+          // ⚠️ Cross-check, not ceremony. A formal proof subsumes fuzzing, so a
+          // DISAGREEMENT here cannot be a property of the patch -- it means our
+          // own plumbing is broken (wrong bytecode etched, wrong file compared).
+          // Cheap, and it fails loudly instead of silently scoring the wrong pair.
+          const cross = await differential(taskBuild.path, built.path);
+          if (!cross.passed) {
+            throw new Error(
+              `INTEGRITY FAILURE: hevm proved the patch equivalent, but gate ${cross.gate} found a ` +
+                `divergence (${cross.counterexample ?? 'no counterexample parsed'}). These cannot both ` +
+                `be true of the same pair of bytecodes. Do not score this run.`,
+            );
+          }
           log(round, 'proved', eq.label);
           const gas = await measurePatch(taskBuild.path, built.path);
           // ⚠️ Above 100% is expected and legitimate: the patch beat the
@@ -288,13 +301,40 @@ export async function runAgent({
             content: `Behaviour differs from the input. The prover found this:\n\n${cex}`,
           });
         } else {
-          // ⚠️ UNKNOWN is not a failure by the model and must not be fed back
-          // as one. The prover gave up; that is our limitation, not its patch.
-          log(round, 'unknown', 'prover did not terminate — keeping the patch, label UNKNOWN');
-          run.rounds.push({ round, outcome: 'unknown' });
-          run.patch = { source: got.source, runtime: built.runtime, path: built.path, label: 'UNKNOWN' };
-          run.stop_reason = 'prover_unknown';
-          return run;
+          // ── level 3 gave up: fall back to level 2, do not fall through ────
+          //
+          // ⚠️ This branch used to accept the patch on the strength of having
+          // compiled: label UNKNOWN, gas measured, receipt published, no
+          // differential evidence of any kind. A ladder whose lower rungs are
+          // skipped when the top one fails is not a ladder.
+          log(round, 'unknown', 'prover did not terminate — falling back to gates 1 and 2');
+          const diff = await differential(taskBuild.path, built.path);
+
+          if (diff.passed) {
+            const campaign = await fuzzCampaign();
+            log(round, 'fuzzed', `${campaign.runs} runs, seed ${campaign.seed}, no divergence`);
+            run.rounds.push({ round, outcome: 'fuzzed', label: 'FUZZED' });
+            const gas = await measurePatch(taskBuild.path, built.path);
+            const denom = gas.v1_total - baselineGas.patch_total;
+            gas.baseline_total = baselineGas.patch_total;
+            gas.relative_progress = denom > 0 ? Number((gas.saved_total / denom).toFixed(4)) : null;
+            run.gas = gas;
+            run.fuzz_campaign = campaign;
+            run.patch = { source: got.source, runtime: built.runtime, path: built.path, label: 'FUZZED' };
+            run.stop_reason = 'fuzzed';
+            return run;
+          }
+
+          // The fuzzer found what the prover could not. This IS a model failure,
+          // and the counterexample is mechanical output, so §5 allows feeding it back.
+          log(round, 'refuted', `gate ${diff.gate} found a divergence the prover could not`);
+          run.rounds.push({ round, outcome: 'refuted', by: `gate${diff.gate}` });
+          messages.push({
+            role: 'user',
+            content:
+              `Behaviour differs from the input. Differential testing found this ` +
+              `counterexample:\n\n${diff.counterexample ?? diff.output.slice(-1200)}`,
+          });
         }
       }
     }
