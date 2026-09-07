@@ -38,9 +38,11 @@ export async function measurePatch(taskHex, patchHex) {
 
   const g = {};
   for (const m of out.matchAll(/WHETSTONE_GAS (\w+) (\d+)/g)) g[m[1]] = Number(m[2]);
+  const digest = out.match(/WHETSTONE_GAS scenario_digest\s*\n\s*(0x[0-9a-f]{64})/)?.[1] ?? null;
   if (g.scored == null) throw new Error('gas measurement produced no readings');
 
   return {
+    scenario_id: digest,
     scenario_inputs: g.scenario_inputs,
     scored: g.scored,
     skipped: g.skipped,

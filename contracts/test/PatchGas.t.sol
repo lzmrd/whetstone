@@ -73,6 +73,10 @@ contract PatchGasTest is Test {
         }
 
         // Machine-readable line. The harness parses this; humans read the rest.
+        // The scenario's identity travels with its numbers, or a score is
+        // quoted without saying what it was scored on.
+        console.log("WHETSTONE_GAS scenario_digest");
+        console.logBytes32(Scenario.digest());
         console.log("WHETSTONE_GAS scenario_inputs", xs.length);
         console.log("WHETSTONE_GAS scored", scored);
         console.log("WHETSTONE_GAS skipped", skipped);

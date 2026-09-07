@@ -11,9 +11,11 @@
     "models": "node --env-file=../.env src/list-models.mjs",
     "agent": "node --env-file=../.env src/run.mjs",
     "access": "node --env-file=../.env src/access-probe.mjs",
-    "prices:sync": "node --env-file=../.env src/sync-prices.mjs"
+    "prices:sync": "node --env-file=../.env src/sync-prices.mjs",
+    "hcs:init": "node --env-file=../.env src/hcs-init.mjs"
   },
   "dependencies": {
+    "@hashgraph/sdk": "^2.81.0",
     "@x402/hedera": "^2.25.0"
   },
   "engines": {

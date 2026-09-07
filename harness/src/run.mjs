@@ -11,6 +11,8 @@
 import { runAgent, INTERFACE } from './agent.mjs';
 import { checkerVersion } from './equivalence.mjs';
 import { resolve, TABLE_HASH } from './providers.mjs';
+import { buildReceipt, publishReceipt } from './receipt.mjs';
+import { readFileSync } from 'node:fs';
 
 const [, , spec, taskPath = '../contracts/src/tasks/Task.sol'] = process.argv;
 if (!spec) {
@@ -68,6 +70,33 @@ cost/1k gas  $${((run.usd / Math.max(g.saved_total, 1)) * 1000).toFixed(8)} per 
   console.log(`\n${run.patch.source}\n`);
   if (run.patch.label === 'UNKNOWN') {
     console.log('⚠️  The prover did not terminate. This is NOT evidence of equivalence.\n');
+  }
+  // ── the canonical record ────────────────────────────────────────────
+  const receipt = await buildReceipt({
+    run,
+    spec,
+    taskSource: readFileSync(taskPath, 'utf8'),
+    taskPath,
+    payment: null,
+  });
+
+  if (process.env.HCS_TOPIC_ID && process.argv.includes('--no-receipt') === false) {
+    const ptr = await publishReceipt(receipt);
+    console.log(`
+receipt      HCS ${ptr.topic_id} seq ${ptr.sequence_number}  (${ptr.bytes} bytes, ${ptr.chunks} chunk)
+             sha256 ${ptr.content_sha256.slice(0, 24)}…
+             read back from mirror: found=${ptr.mirror.found} hash_matches=${ptr.mirror.matches}
+             ${ptr.mirror.url}`);
+    if (!ptr.mirror.matches) console.log('\n⚠️  MIRROR MISMATCH — the published record differs from what was sent.\n');
+  } else {
+    console.log('\nreceipt      not published (HCS_TOPIC_ID unset or --no-receipt)');
+  }
+
+  if (receipt.artifacts.dirty) {
+    console.log('\n⚠️  Working tree is dirty: the commit hash in the receipt does not describe what ran.');
+  }
+  if (receipt.guarantee && receipt.guarantee.mutation_refuted === false) {
+    console.log('⚠️  mutation_refuted=false — placeholder task, no mutation applied. NOT a valid benchmark run.');
   }
 } else {
   console.log(`\n✗ no patch passed the gates. Round outcomes: ${run.rounds.map((r) => r.outcome).join(' → ')}`);
