@@ -11,13 +11,51 @@ Whetstone runs open-weight models against Solidity optimization tasks under a re
 
 ---
 
+## What this is trying to be
+
+**Public benchmarks for LLMs decay.** Once a benchmark is public its answers are in
+the next training run, and a rising score stops being evidence of a rising
+capability. Whetstone is an attempt at a code-optimization benchmark that resists
+that, built on three properties:
+
+**1. The answer cannot be memorized.** Every task is a *semantically mutated*
+variant of a well-known library function. Every model has OpenZeppelin and solady
+in its training data — so the mutation is chosen to make the memorized answer
+**wrong**, and a memorized answer is then rejected at the equivalence gate. The
+benchmark defends itself instead of relying on secrecy. (Hiding the task is not an
+option: to have a model optimize code you must send it the code, and it runs on
+the servers of the lab you would be hiding it from.)
+
+**2. The score is recomputed, not measured.** Gas, under a toolchain pinned in
+every receipt — not wall-clock on somebody's laptop. Publish the receipt and
+anyone can recompute the number and catch a lie.
+
+**3. Correctness is machine-checked, and the strength of the check is part of the
+result.** Not "the tests pass", but one of four declared labels, from a completed
+symbolic-equivalence proof down to `UNKNOWN` when the solver gives up. A gas saving
+with no guarantee attached is not a result.
+
+### What exists, and what does not
+
+**What exists after five days is the evaluation engine** — harness, gates,
+guarantee vocabulary, receipts, cost accounting — validated end to end on a small
+hand-built task set.
+
+⚠️ **What would make it an actual benchmark is scale**: hundreds of tasks mined
+from real merged optimization commits, where the baseline is the human commit
+rather than anything we wrote. That is **roadmap, not built**, it uses a different
+baseline, and results from the two are never comparable. See Track S and Track H in
+[the design notes](spec/DESIGN-NOTES.md).
+
 ## Declared scope — read this first
 
-This is a **method demonstration with a leaderboard interface**, not a benchmark of models.
+What is built this week is a **method demonstration with a leaderboard interface**.
+It is **not a ranking of models**.
 
 - **1-2 functions, n≥5 seeds per configuration.**
-- With that few independent tasks you cannot rank models, and this project does not claim to.
+- With that few independent tasks you cannot rank models, and this project does not claim to. Ties are the normal outcome and are reported as ties.
 - The question it answers: *"how does an agent perform on a small, declared set of Solidity tasks under a fixed budget?"*
+- The question it does **not** answer yet: *"which model is better at optimizing Solidity?"* — that needs Track H.
 
 ## Prior art
 
