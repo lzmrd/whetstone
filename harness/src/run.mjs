@@ -27,7 +27,7 @@ try {
   console.error(`\n✗ ${e.message}\n`);
   process.exit(1);
 }
-const { model, price, baseUrl, apiKey } = target;
+const { provider, model, price, baseUrl, apiKey } = target;
 
 const pad = (s, n) => String(s).padEnd(n);
 console.log(`
@@ -43,6 +43,7 @@ const run = await runAgent({
   model,
   taskPath,
   price,
+  provider,
   baseUrl,
   apiKey,
   log: (round, outcome, detail) =>
@@ -77,7 +78,8 @@ cost/1k gas  $${((run.usd / Math.max(g.saved_total, 1)) * 1000).toFixed(8)} per 
     spec,
     taskSource: readFileSync(taskPath, 'utf8'),
     taskPath,
-    payment: null,
+    payment: run.payments?.[0] ?? null,
+    payments: run.payments,
   });
 
   if (process.env.HCS_TOPIC_ID && process.argv.includes('--no-receipt') === false) {

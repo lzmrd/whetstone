@@ -12,7 +12,8 @@
     "agent": "node --env-file=../.env src/run.mjs",
     "access": "node --env-file=../.env src/access-probe.mjs",
     "prices:sync": "node --env-file=../.env src/sync-prices.mjs",
-    "hcs:init": "node --env-file=../.env src/hcs-init.mjs"
+    "hcs:init": "node --env-file=../.env src/hcs-init.mjs",
+    "gateway": "node --env-file=../.env ../gateway/server.mjs"
   },
   "dependencies": {
     "@hashgraph/sdk": "^2.81.0",

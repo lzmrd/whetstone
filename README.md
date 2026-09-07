@@ -4,9 +4,12 @@
 
 Whetstone runs open-weight models against Solidity optimization tasks under a real, on-chain budget, and reports three things together: **how much gas was saved**, **what it cost to get there**, and **what level of correctness guarantee actually backs each patch**.
 
-> 🚧 **Status: day 1 complete.** Specification, measurement harness and equivalence
-> gate are standing and self-checked; the agent loop, payments-per-round and
-> on-chain records are not built yet.
+> 🚧 **Status: the vertical slice runs end to end.** x402 challenge → settled
+> Hedera payment → inference → symbolic equivalence → gas over a fixed scenario →
+> receipt on HCS, read back and hash-checked.
+> ⚠️ Not yet a benchmark run: the task is a placeholder and no mutation has been
+> applied, which every receipt records as `mutation_refuted: false`. The registry
+> on Base Sepolia and the subgraph are next.
 > Built for [ETHOnline 2026](https://ethglobal.com/events/ethonline2026), Start Fresh track. Solo builder.
 
 ---

@@ -18,7 +18,7 @@ const git = (args) => {
   catch { return null; }
 };
 
-export async function buildReceipt({ run, spec, taskSource, taskPath, payment }) {
+export async function buildReceipt({ run, spec, taskSource, taskPath, payment, payments = [] }) {
   const dirty = git(['status', '--porcelain']) !== '';
 
   return {
@@ -55,8 +55,10 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment })
       // conflated. usd_list is "what this would cost anyone" at published list
       // price; hbar_paid is what actually moved on Hedera.
       usd_list: run.usd.toFixed(8),
-      hbar_paid: payment?.hbar ?? '0',
-      settle_tx: payment?.transaction_id ?? null,
+      // What actually moved on Hedera: one settled payment per round, summed.
+      hbar_paid: (payments.reduce((n, p) => n + Number(p.amount_tinybar), 0) / 1e8).toFixed(8),
+      settlements: payments.map((p) => ({ tx: p.transaction, amount_tinybar: p.amount_tinybar, pay_to: p.pay_to })),
+      settle_tx: payments[0]?.transaction ?? payment?.transaction_id ?? null,
     },
 
     gas: run.gas

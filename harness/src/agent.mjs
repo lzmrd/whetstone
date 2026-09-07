@@ -18,6 +18,7 @@ import { extractSolidity } from './extract.mjs';
 import { compileToRuntime, PINS } from './compile.mjs';
 import { equivalent, counterexampleFor } from './equivalence.mjs';
 import { measurePatch } from './gas.mjs';
+import { signPayment } from './pay.mjs';
 
 /** §5: identical across all models and seeds. Changing one breaks comparability. */
 export const INTERFACE = {
@@ -46,13 +47,48 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * round -- otherwise a busy provider would show up in the results as a model
  * that failed the task.
  */
-async function callModel({ baseUrl, apiKey, model, messages, maxTokens, log }) {
+async function callModel({ baseUrl, apiKey, model, messages, maxTokens, log, gateway, payments }) {
   for (let attempt = 1; attempt <= 4; attempt++) {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, max_tokens: maxTokens }),
-    });
+    let res;
+
+    if (gateway) {
+      // ── x402: ask, get refused, pay what the SERVER asks, ask again ──
+      // The price comes from the 402 body, never from our own config: a client
+      // that decides what to pay is not being gated by anything.
+      const url = `${gateway}/v1/chat/completions`;
+      const payload = JSON.stringify({ model, messages, max_tokens: maxTokens });
+      const headers = { 'Content-Type': 'application/json' };
+
+      const challenge = await fetch(url, { method: 'POST', headers, body: payload });
+      if (challenge.status === 402) {
+        const { accepts } = await challenge.json();
+        const req = accepts?.[0];
+        if (!req) throw new Error('gateway returned 402 with no payment requirements');
+        const signed = await signPayment(req.amount, req.payTo);
+        log?.(0, 'paid', `${req.amount} tinybar to ${req.payTo} — settling before inference`);
+        res = await fetch(url, {
+          method: 'POST',
+          headers: { ...headers, 'X-PAYMENT': signed.header },
+          body: payload,
+        });
+        const proof = res.headers.get('x-payment-response');
+        if (proof) {
+          const p = JSON.parse(Buffer.from(proof, 'base64').toString('utf8'));
+          payments?.push({ amount_tinybar: req.amount, pay_to: req.payTo, ...p });
+          log?.(0, 'settled', p.transaction);
+        }
+      } else {
+        // ⚠️ A gateway that answers without demanding payment is not gating
+        // anything. Refuse rather than quietly enjoying free inference.
+        throw new Error(`gateway answered HTTP ${challenge.status} without a 402 challenge — it is not gating`);
+      }
+    } else {
+      res = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages, max_tokens: maxTokens }),
+      });
+    }
 
     if (res.status === 429) {
       const body = await res.text();
@@ -89,6 +125,8 @@ async function callModel({ baseUrl, apiKey, model, messages, maxTokens, log }) {
  */
 export async function runAgent({
   model,
+  provider,
+  gateway = process.env.GATEWAY_URL || null,
   taskPath,
   contractName = 'Candidate',
   sig = 'f(uint256)',
@@ -145,6 +183,7 @@ export async function runAgent({
     rounds: [],
     tokens_in: 0,
     tokens_out: 0,
+    payments: [],
     usd: 0,
     metered: true,
     patch: null,
@@ -154,7 +193,7 @@ export async function runAgent({
   for (let round = 1; round <= maxRounds; round++) {
     let call;
     try {
-      call = await callModel({ baseUrl, apiKey, model, messages, maxTokens, log });
+      call = await callModel({ baseUrl, apiKey, model: gateway ? `${provider}/${model}` : model, messages, maxTokens, log, gateway, payments: run.payments });
     } catch (e) {
       run.rounds.push({ round, outcome: 'provider_error', detail: e.message });
       run.stop_reason = 'provider_error';
