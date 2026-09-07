@@ -59,30 +59,64 @@ A target must satisfy three things at once. A review named this and the specs ha
 Seven candidates were measured on day 1 ([spike results](spike/DAY1-RESULTS.md)),
 over the exhaustive `boundary/v1` scenario — 769 inputs.
 
-| Target | Verdict | Gas/call | Total gap |
-|---|---|---|---|
-| **`toHexString`** ✅ **headroom target** | partial exploration → `FUZZED` | **7 596** | 5 841 982 |
-| **`log256`** ✅ **formal target** | proven equivalent, complete | 32 | 25 237 |
-| `log2` | proven equivalent, complete | 18 | 14 446 |
-| `toString` | partial exploration | 486 | — |
-| `sqrt`, `log10` | partial exploration | — | — |
-| `mulDiv` | **not** equivalent, counterexample | — | semantics-laden |
+| Target | Verdict | Gas/call | Total gap | Base spread |
+|---|---|---|---|---|
+| **`toHexString`** ✅ **headroom target** | partial exploration → `FUZZED` | **7 703** | 5 923 872 | 15 710 |
+| **`log256`** ✅ **formal target** | proven equivalent, complete | 66 | 50 754 | 0 |
+| `log2` | proven equivalent, complete | 52 | 39 988 | 0 |
+| `toString` | partial exploration | 486 | — | — |
+| `sqrt`, `log10` | partial exploration | — | — | — |
+| `mulDiv` | **not** equivalent, counterexample | — | semantics-laden | — |
+
+⚠️ **These figures are the third measurement, and the first from an instrument
+with a control on it.** Two earlier instruments were biased — one unstable under
+unrelated edits, one favouring whichever contract was measured first by ~10% of
+the delta. Both wrote numbers into this file before the bias was found. The
+current instrument is asserted order-neutral by
+[`OrderControl.t.sol`](../contracts/test/OrderControl.t.sol) on every run.
+Full account and two retracted claims: [spike results, Addendum 4](spike/DAY1-RESULTS.md).
 
 ⚠️ **High headroom and symbolic tractability did not coexist in any candidate.**
 The trilemma does not break; it is navigated by carrying **two targets with two
 different labels**. A guarantee vocabulary that only ever prints one label is
 decoration.
 
-### Admission rule — pre-declared, before any measured run
+### Scoring rule — pre-declared, before any measured run
 
-> Primary metric is **absolute gas over the fixed scenario**. Percentage is derived
-> and secondary: with gaps of tens of gas, a percentage has ridiculous resolution
-> and invites cherry-picking the function.
+> **1. Ranking key**: total gas over the fixed scenario. Percentage is derived and
+> secondary — with gaps of tens of gas a percentage has ridiculous resolution and
+> invites cherry-picking the function.
+>
+> **2. Mandatory second column**: **max regression**, the worst single-input
+> increase over the baseline across the 769 inputs. **No leaderboard row exists
+> with only one of the two.**
+>
+> **3. Veto**: none. A patch that improves the total wins on the total, and its
+> regression is published beside it. A veto threshold picked after seeing results
+> would be a knob to move; a published column is a fact the reader weighs.
 
-⚠️ On `log256` the input-dependent spread (81 gas) **exceeds** the mean saving (32).
-Gas is deterministic per input, so a fixed scenario still gives an exact total — but
-**report total plus min/max/spread, never a bare mean**, because a patch can improve
-some inputs and worsen others and net out ambiguously.
+The scenario's identity is `Scenario.digest()` — `keccak256` of the input vector —
+**not** the string `boundary/v1`. A name would stay identical while the vector
+underneath it changed, letting two runs claim the same scenario and have been
+scored on different inputs.
+
+⚠️ **Retracted**: earlier revisions of this file stated that `log256` has an
+input-dependent spread of 81 gas exceeding its mean saving. The measured spread is
+**0** — OpenZeppelin 5.x implements `log2` and `log256` branchlessly. The apparent
+spread was memory expansion inside the measuring loop. Input-dependence remains a
+real risk for a *candidate patch*, which is why the max-regression column is
+measured every run rather than assumed.
+
+### Pre-declared expected outcome
+
+> On `log256` — 66 gas per call, branchless, already squeezed by Vectorized — a
+> model scoring **0, or noise-level patch churn, is the anticipated result**. It is
+> a publishable null result and it is written here **before the first measured
+> run**, because a null result declared in advance is an experimental design and
+> the same result explained afterwards is an excuse.
+>
+> `toHexString` carries the headroom (7 703 gas per call) and therefore carries the
+> risk of the weaker label. That asymmetry is the finding, not a flaw in it.
 
 ### Baseline construction — bilateral mutation
 

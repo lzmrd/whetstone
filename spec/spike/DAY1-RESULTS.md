@@ -230,3 +230,87 @@ Applied to measurement rather than to preference:
 **Final pairing: `log256` (FORMAL, exact, small) + `toHexString` (FUZZED, large).**
 Two targets, two labels, the leaderboard saying which is which — a guarantee
 vocabulary that only ever prints one label is decoration.
+
+---
+
+# Addendum 4 — the instrument was biased twice, and two spec claims are withdrawn
+
+Written after building an **order-neutrality control** for the gas harness. It
+should have existed before any number was written into the spec; it did not, and
+two claims that reached WHETSTONE §1 were artefacts of the measuring instrument
+rather than properties of the code.
+
+## Three instruments
+
+| # | Method | Fault | log256 gas/call |
+|---|---|---|---|
+| 1 | `gasleft()` around **inlined internal** calls | Moved 27 → 39 → 66 as unrelated imports were added to the test file | 66 (sparse fixtures) |
+| 2 | Two separate loops, Solidity `.staticcall` | Memory is not reset between internal calls, so whoever ran **second** paid memory expansion at a higher offset where the quadratic term dominates. `.staticcall` also copies returndata, so memory grew *between* the two calls even inside one paired loop | 32 |
+| 3 | One pre-allocated calldata buffer, raw `staticcall` with `outsize = 0` | Order bias measured at **0** | **66** |
+
+Instrument 2's bias, measured directly by running the same comparison in both
+orders: **5 038 gas over 769 inputs on `log256`** — about 10% of the delta it was
+reporting. The control is now [`OrderControl.t.sol`](../../contracts/test/OrderControl.t.sol)
+and asserts `bias == 0`, so this cannot regress silently.
+
+## Corrected figures — `boundary/v1`, instrument 3
+
+Scenario digest `0xd8fd95fe…3e81f00`, 769 inputs, 0 skipped.
+
+| Target | Base total | Candidate total | Saved total | Per call | Base spread | Max regression |
+|---|---|---|---|---|---|---|
+| `toHexString` | 7 565 070 | 1 641 198 | **5 923 872** | **7 703** | 15 710 | 0 |
+| `log256` | 413 722 | 362 968 | **50 754** | **66** | **0** | 0 |
+| `log2` | 451 403 | 411 415 | 39 988 | 52 | **0** | 0 |
+
+## Withdrawal 1 — the exhaustive fixtures did **not** halve the gap
+
+Addendum 3 reported that the sparse ten-input set overstated the gap by roughly
+2× (`log256` 66 → 32, `log2` 51 → 18), and called this *"the strongest argument
+in the project for the scenario being a first-class artifact"*.
+
+**That was instrument 2's bias, not fixture overfitting.** With an instrument
+that passes an order control, the exhaustive set gives 66 gas/call — the same
+figure the sparse set gave. Changing the fixtures and changing the instrument
+happened in the same step, and the effect was attributed to the wrong one.
+
+The design argument for exhaustive fixtures survives on its own terms: a model's
+patch can be input-dependent even when the baseline is not, and a sparse set
+would not see it. But it survives **as an a-priori argument with no supporting
+measurement**, which is weaker than what was claimed, and the claim is retracted
+rather than quietly softened.
+
+## Withdrawal 2 — there is no input-dependent spread on the log targets
+
+WHETSTONE §1 warned that *"on `log256` the input-dependent spread (81 gas)
+exceeds the mean saving (32)"*, and built a reporting rule on it.
+
+The measured spread is **0**. `log2` and `log256` cost identical gas on every one
+of the 769 inputs, because OpenZeppelin 5.x implements both branchlessly. The
+81- and 93-gas "spreads" were memory expansion accumulating across the loop.
+
+Controls that make the zero credible rather than suspicious:
+
+- `toHexString`, measured by the same instrument in the same run, has a spread of
+  15 710 — so the harness is varying the argument.
+- [`HarnessSelfCheck.t.sol`](../../contracts/test/HarnessSelfCheck.t.sol) asserts
+  the scenario produces **94 distinct** `log256` results. A bug sending the same
+  argument 769 times would have looked like the stability we were trying to
+  achieve, and would have been believed.
+
+Consequence: the concern about a patch that "improves some inputs and worsens
+others" is an a-priori risk for a *candidate*, not an observed property of the
+baseline — and it is now measured on every run rather than assumed, via the
+mandatory max-regression column.
+
+## Consequence for the admission rule
+
+The reviewer's objection was aimed at a 32-gas denominator where 1 gas is 3.1%.
+With the corrected figure the formal target is **66 gas/call, 50 754 total**, and
+1 gas is 1.5%. Two notes on the objection itself, recorded because getting this
+wrong in the submission would be worse than getting it wrong here:
+
+- There was never a *"gap ≥ 100 gas"* rule to violate. The pre-declared rule is
+  in WHETSTONE §1 and is about absolute gas being primary and percentage derived.
+- `log256` was never coarser than `log2`. At 32 gas one gas was 3.1%; at `log2`'s
+  18 it was 5.6%. `log256` was and remains the finer instrument of the two.
