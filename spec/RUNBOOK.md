@@ -84,32 +84,95 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
 
 ---
 
-## Receipt schema (HCS)
+## Receipt schema (HCS) — v2
 
 ```json
 {
+  "schema":        "whetstone/receipt/v2",
   "run_id":        "",
-  "function":      "OZ/Math.mulDiv",
-  "variant_hash":  "keccak256 of the variant source",
-  "baseline_hash": "keccak256 of restored_M",
-  "model":         "provider/model@version",
-  "seed":          0,
-  "spend_usdc":    "0.000000",
-  "gas_v1":        0,
-  "gas_baseline":  0,
-  "gas_patch":     0,
-  "relative_progress": 0.0,
-  "guarantee":     "FORMAL_NO_EXPLICIT_INPUT_BOUND | FORMAL_BOUNDED | FUZZED | UNKNOWN",
-  "bounds":        { "max_iterations": null, "max_input_len": null },
-  "toolchain":     { "solc": "", "evm_version": "", "optimizer_runs": 0,
-                     "checker": "", "checker_version": "", "wrapper_hash": "" },
-  "timestamp":     ""
+  "round":         1,
+  "status":        "provisional",
+
+  "task": {
+    "function":      "OZ/Math.log2",
+    "variant_hash":  "keccak256 of the mutated variant source",
+    "baseline_hash": "keccak256 of the baseline source",
+    "scenario_id":   "logs/v1",
+    "scenario_hash": "keccak256 of the fixture set",
+    "prompt_hash":   "keccak256 of the fixed system prompt"
+  },
+
+  "agent": {
+    "model":       "provider/model@version",
+    "seed":        0,
+    "temperature": null,
+    "max_rounds":  8,
+    "rounds_used": 3
+  },
+
+  "cost": {
+    "tokens_in":     0,
+    "tokens_out":    0,
+    "price_table":   { "version": 1, "sha256": "", "retrieved": "2026-09-06" },
+    "usd_list":      "0.000000",
+    "hbar_paid":     "0",
+    "settle_tx":     ""
+  },
+
+  "gas": { "v1": 0, "baseline": 0, "patch": 0, "relative_progress": 0.0 },
+
+  "guarantee": {
+    "label":  "FORMAL_NO_EXPLICIT_INPUT_BOUND | FORMAL_BOUNDED | FUZZED | UNKNOWN",
+    "bounds": { "max_iterations": null, "max_input_len": null },
+    "reverts_covered": true
+  },
+
+  "toolchain": {
+    "solc": "0.8.35", "evm_version": "osaka", "optimizer_runs": 200,
+    "checker": "hevm", "checker_version": "0.58.0", "solver": "bitwuzla",
+    "wrapper_hash": "", "oz_version": "v5.7.0", "solady_version": "v0.1.26"
+  },
+
+  "artifacts": { "repo": "", "commit": "", "path": "" },
+
+  "timestamp": ""
 }
 ```
 
-⚠️ Without a **complete** `toolchain` and `bounds`, the guarantee label is unverifiable and the receipt is worthless.
+⚠️ Every field above exists because something breaks without it:
 
----
+| Field | Without it |
+|---|---|
+| `scenario_id` / `scenario_hash` | Gas for a pure function depends on its inputs. A score quoted without its fixture set is **undefined**, and invites cherry-picking |
+| `prompt_hash`, `max_rounds`, `temperature` | The agent interface is the independent variable; runs are not comparable |
+| `round` | A patch found on round 1 and one found on round 8 cost different amounts |
+| `status` | The leaderboard would fake a finality it does not have |
+| `usd_list` **and** `hbar_paid` | ⚠️ **They are different numbers.** HBAR is what actually moved; USD is `tokens × list price` from a pinned table. Do not conflate |
+| `price_table` | The list price is pinned by hand — the Zen `/v1/models` endpoint returns **no pricing** — so the table version and hash must travel with the number |
+| `artifacts.repo/commit/path` | "Anyone can recompute" is empty without saying *what* to recompute and *where it lives* |
+| `reverts_covered` | Measured on day 1 as `true` for hevm. Do not assume it for another checker |
+
+## Artifact publication — what "anyone recomputes" actually requires
+
+A tamper-evident log only protects against rewriting history. It does **not**
+protect against a false value written the first time. Recomputation is the only
+real defence, and it needs the inputs to be public.
+
+**Every scored run publishes, in this repo, at the commit named in the receipt:**
+
+```
+artifacts/<run_id>/
+  variant.sol         the mutated source the model was given
+  baseline.sol        the baseline it is measured against
+  patch.sol           what the model returned
+  wrapper.sol         the exact wrapper compiled
+  scenario.json       the fixture set, with its id and hash
+  prompt.txt          the fixed system prompt
+  result.txt          raw checker output, including any partial-exploration warning
+```
+
+With those plus `toolchain`, a third party reproduces `gas.*` and the guarantee
+label without asking us for anything.
 
 ## Commands
 
@@ -121,7 +184,7 @@ forge snapshot --match-contract <C>
 forge test --match-contract <C> -vvv
 
 # differential fuzzing (compares return bytes, revert bytes, storage, events)
-forge test --match-test testDiff --fuzz-runs 1000000
+forge test --match-test testDiff --fuzz-runs 20000
 
 # equivalence — hevm (bytecode level)
 hevm equivalence --code-a <bytecode-a> --code-b <bytecode-b>
@@ -131,6 +194,15 @@ halmos --function check_Equivalence
 ```
 
 ---
+
+⚠️ **`--fuzz-runs 1000000` was unrealistic** and is dropped. A million runs against two
+implementations is hours of CPU per pair, incompatible with the calendar — and uniform
+random sampling covers the cases that matter *badly*: a zero divisor, a product that
+overflows, the boundary at `2**128`. Random draws almost never land on them.
+
+> **Structured corpus, not volume.** The fixture set in `scenario.json` carries the
+> boundaries explicitly; fuzzing runs on top of it to catch what was not thought of.
+> 20k runs over a seeded corpus beats 1M uniform draws for this shape of function.
 
 ## Pivot gates
 
@@ -190,7 +262,7 @@ NEVER cut:
   · the allocator querying the subgraph (it is The Graph deliverable)
   · the "subgraph disabled" fallback path — it exists ONLY to be filmed,
     and it is what proves the subgraph is load-bearing rather than decorative
-    (WHETSTONE §10, beat 3)
+    (WHETSTONE §11, beat 3)
 ```
 
 **Challenge contract**: already roadmap per decision R7. If it is absent, **do not say "the EVM as arbiter"** in the demo or the README.

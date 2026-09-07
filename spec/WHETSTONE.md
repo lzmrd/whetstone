@@ -46,6 +46,38 @@ Whetstone has **two tracks with different architectures**. Conflating them is an
 
 **What it actually proves**: that the **evaluation engine** works — not that Track H will.
 
+### The target — decided from measurement, not preference
+
+A target must satisfy three things at once. A review named this and the specs had not:
+
+| Leg | Requirement |
+|---|---|
+| **(a)** | Enough headroom to leave a measurable gap |
+| **(b)** | Tractable for symbolic equivalence |
+| **(c)** | Hand-mutable while preserving difficulty |
+
+`mulDiv` maximizes (a) and fails (b) and (c). Five candidates were measured on day 1
+([spike results](spike/DAY1-RESULTS.md)):
+
+| Target | Verdict | Headroom |
+|---|---|---|
+| **`log2`** ✅ **primary** | proven equivalent, complete exploration | 19% (52 gas/call) |
+| **`log256`** ✅ secondary | proven equivalent, complete exploration | 12% |
+| `sqrt`, `log10` | partial exploration → `UNKNOWN` | — |
+| `mulDiv` | **not** equivalent, counterexample | large, but semantics-laden |
+
+⚠️ **Headroom on `log2` is 52 gas.** Real but small, so the denominator is coarse:
+a model saving 20 gas scores 38%. **Show the quantization, do not smooth it.**
+
+💡 **On `log2` and `log256`, OZ and solady are proven equivalent**, so the baseline is
+solady itself — externally authored, not written by us. Circularity and the
+hand-writing burden both disappear for the unmutated baseline; `restored_M` is still
+hand-written but over a far simpler function.
+
+**`mulDiv` stays in as the Branch B by-product**: it is *not* equivalent
+(`Panic(0x12)` vs `FullMulDivFailed()`), so it carries the measured price of
+semantics. Both branches exist, on different functions.
+
 ---
 
 ## 2. Prior art
@@ -72,7 +104,7 @@ Whetstone has **two tracks with different architectures**. Conflating them is an
 | R3 | The **mutated variant is the run's v1 reference**. Gates prove against it |
 | R4 | Mutation is **semantic**, never cosmetic |
 | R5 | Report **median and dispersion**, never a single value |
-| R6 | MVP leaderboard = **CLI/JSON**. Minimal web view is a judged criterion (see §9) |
+| R6 | MVP leaderboard = **CLI/JSON**. Minimal web view is a judged criterion (see §10) |
 | R7 | **Day 3 is The Graph.** The challenge contract moves to roadmap, and **"the EVM as arbiter" leaves the narrative** |
 | R8 | **Demo video: 2-4 minutes**, ≥720p, narrated by a human. No AI voiceover, no speed-up, no phone recording |
 | R9 | **Commit early and often.** Large single commits risk disqualification |
@@ -111,7 +143,56 @@ Not "two artifacts". A complete chain requires:
 
 ---
 
-## 5. Metric
+## 5. Agent interface — the benchmark's independent variable
+
+⚠️ What the model sees **is** the experiment. Leaving it unspecified makes runs
+incomparable and was a real gap in earlier revisions.
+
+### What the model receives
+
+| Included | Excluded — and why |
+|---|---|
+| The **mutated variant** source, complete and compilable | The **original OZ source**. If the model sees both it can diff them, recover the mutation, and the anti-memorization defence evaporates |
+| The function signature and a one-line task statement | Any reference to solady, or to the baseline's gas figure |
+| The **gas scenario** (fixture set) it is measured on | The names "OpenZeppelin", "solady", "Whetstone" anywhere in the prompt |
+| The toolchain: solc version, evm_version, optimizer runs | Prior patches by other models in the same batch |
+
+### The loop
+
+```
+round 1 : variant + task  ──────────────►  patch
+                          ◄──────────────  gates run
+round 2 : + gate feedback ──────────────►  patch
+          (compile errors, failing test,
+           equivalence counterexample,
+           gas delta so far)
+          …
+stop when: budget exhausted, OR max_rounds reached,
+           OR two consecutive rounds with no gas improvement
+```
+
+**Multi-turn with gate feedback**, not single-shot. Rationale: single-shot measures
+recall; iterating against a counterexample measures whether the model can use
+evidence. That is the capability the project claims to measure.
+
+⚠️ **Feedback is mechanical output only** — the compiler's error, the failing input,
+the gas number. No hints, no guidance, nothing hand-written per model.
+
+### Fixed parameters, identical across all models and seeds
+
+| Parameter | Value |
+|---|---|
+| `max_rounds` | **8** |
+| `budget_usd_per_run` | **0.05** at list price, whichever binds first |
+| `temperature` | provider default, recorded in the receipt |
+| System prompt | one, fixed, committed in the repo and hashed into the receipt |
+
+⚠️ Change any of these and results stop being comparable. They are versioned with the
+prompt hash; a change bumps the scenario version.
+
+---
+
+## 6. Metric
 
 ```
                      gas(v1) − gas(patch)
@@ -125,7 +206,7 @@ v1 = `variant_f` · baseline = `restored_M_f`
 
 ---
 
-## 6. Gates and guarantee vocabulary
+## 7. Gates and guarantee vocabulary
 
 | Level | Tool | Covers |
 |---|---|---|
@@ -146,7 +227,7 @@ v1 = `variant_f` · baseline = `restored_M_f`
 
 ---
 
-## 7. Variance
+## 8. Variance
 
 | Rule | Value |
 |---|---|
@@ -155,7 +236,9 @@ v1 = `variant_f` · baseline = `restored_M_f`
 | Cost | A random variable, same rule |
 | Overlapping intervals | **Declare a tie** |
 
-⚠️ n=5 gives median and dispersion, **not statistical power** (~9 runs for 2%, ~36 for 1%). Ties will be the normal outcome.
+⚠️ n=5 gives median and dispersion, **not statistical power**. Ties will be the normal outcome.
+
+⚠️ **On the run-count figures**: earlier drafts quoted "~9 runs to detect 2%, ~36 for 1%" without a source. They are **our own order-of-magnitude estimate** from the usual inverse-square relation between effect size and sample count, not a citation. Either derive them with stated assumptions or drop the numbers — in a project whose thesis is rigour, an unsourced figure is worse than none.
 
 **Statistical units, never to be conflated**: seed = sampling instability · function = independent task · family = domain robustness. With 3-5 functions you get 15-25 observations but **3-5 tasks**.
 
@@ -163,7 +246,7 @@ v1 = `variant_f` · baseline = `restored_M_f`
 
 ---
 
-## 8. Environment authority
+## 9. Environment authority
 
 Three environments with distinct roles. State this explicitly or it reads as confusion.
 
@@ -175,7 +258,7 @@ Three environments with distinct roles. State this explicitly or it reads as con
 
 ⚠️ **Why a third chain**: The Graph does **not** support Hedera (its supported-networks page 404s; Hedera's own docs point to running a *local* graph node, which the bounty disqualifies as "local-only"). HCS is not EVM and cannot be indexed by a subgraph. So a minimal `RunRegistry` on Base Sepolia emits one event per run, and the subgraph indexes that.
 
-⚠️ **Anticipate "you are indexing your own contract, that is circular."** The answer is the ArcBook pattern: **the subgraph is the allocator's memory across rounds** — remove it and the allocation loop stops working. Do not just say it, **show it** (§10).
+⚠️ **Anticipate "you are indexing your own contract, that is circular."** The answer is the ArcBook pattern: **the subgraph is the allocator's memory across rounds** — remove it and the allocation loop stops working. Do not just say it, **show it** (§11).
 
 ### Who is the agent, and who is under test
 
@@ -225,7 +308,7 @@ Given the event you can fetch the HCS message from the mirror node and compare h
 
 ---
 
-## 9. Judging criteria → what to build
+## 10. Judging criteria → what to build
 
 ETHGlobal judges on five criteria. Mapping:
 
@@ -241,7 +324,7 @@ ETHGlobal judges on five criteria. Mapping:
 
 ---
 
-## 10. Demo beats — what must be filmable
+## 11. Demo beats — what must be filmable
 
 2-4 minutes. Each beat is a build requirement, not a storyboard nicety.
 
@@ -275,7 +358,7 @@ N functions, M families, n seeds, prior art named, and what this does **not** me
 
 ---
 
-## 11. Partner prize deliverables
+## 12. Partner prize deliverables
 
 Up to **3 partner prizes** may be selected; a partner with multiple tracks counts as **1**. We use all 3.
 
@@ -319,11 +402,11 @@ Minimal honest deliverable — no oversell:
 
 ---
 
-## 12. Plan — real calendar
+## 13. Plan — real calendar
 
 **Sunday 6 (today) — setup, no product code**
 - `git init`, repo structure, `/spec` with these documents committed **now** (real timestamps)
-- **Request Blocky402 access** — third-party dependency, the single item that can block everything
+- ✅ **Blocky402 needs no access request** — testnet is open access. The real dependency is a funded Hedera account, which is under our control
 - Fix the TO FIX rows in the [RUNBOOK](RUNBOOK.md): solc, EVM version, optimizer runs, provider, budget
 - Skim GasAgent and RAGas
 
@@ -345,7 +428,7 @@ Hand-written semantic variant · `restored_M` + proof · gas precondition check 
 
 **Thursday 10 — freeze at 18:00, then record**
 Morning: multi-seed batch, then minimal web view (judged criterion)
-Afternoon: **feature freeze**, then record the 2-4 min video — **the five beats in §10 are build requirements, check them before freezing**
+Afternoon: **feature freeze**, then record the 2-4 min video — **the five beats in §11 are build requirements, check them before freezing**
 Only if all of the above is done: second function, or the Uniswap deliverable
 
 **Friday 11, morning — submission only. No code.**
@@ -359,7 +442,7 @@ Ratchet · procedural mutation engine · control family · cross-family dispersi
 
 ---
 
-## 13. Risks
+## 14. Risks
 
 1. **Formal equivalence**, three escalating levels: patch on ordinary Solidity → `OZ ≡ restored` on **assembly** → whether the tool covers **revert payloads**. Without #2 there is no denominator; without #3 reverts drop to gate 2.
 2. **Reduced novelty**: with GasAgent and RAGas published, only the guarantee and cost layer remains.
