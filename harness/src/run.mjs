@@ -12,11 +12,13 @@ import { runAgent, INTERFACE } from './agent.mjs';
 import { checkerVersion } from './equivalence.mjs';
 import { resolve, TABLE_HASH } from './providers.mjs';
 import { buildReceipt, publishReceipt } from './receipt.mjs';
-import { readFileSync } from 'node:fs';
+import { loadManifest, prepareTask } from './task.mjs';
+import { requireSelfCheck } from './selfcheck.mjs';
 
-const [, , spec, taskPath = '../contracts/src/tasks/Task.sol'] = process.argv;
+const [, , spec] = process.argv;
 if (!spec) {
-  console.error('\nusage: npm run agent -- <provider/model> [task.sol]\n');
+  console.error('\nusage: npm run agent -- <provider/model>');
+  console.error('  the task comes from contracts/src/tasks/manifest.json (override with TASK_MANIFEST)\n');
   process.exit(1);
 }
 
@@ -28,6 +30,19 @@ try {
   process.exit(1);
 }
 const { provider, model, price, baseUrl, apiKey } = target;
+
+// ⚠️ R12 applies to a single run exactly as it does to a batch. This path was
+// left out when the rule was first enforced, which is how a rule half-applied
+// becomes a rule not applied.
+process.stdout.write('self-check … ');
+await requireSelfCheck();
+console.log('✓');
+
+const manifest = loadManifest();
+process.stdout.write(`preparing ${manifest.id} — both proofs … `);
+const prepared = await prepareTask(manifest);
+console.log(`proof 1 ${prepared.proof_1}, proof 2 ${prepared.proof_2} (kind=${prepared.kind}) ✓`);
+const taskPath = manifest.task.path;
 
 const pad = (s, n) => String(s).padEnd(n);
 console.log(`
@@ -41,7 +56,7 @@ prices       v${(await import('./providers.mjs')).TABLE._version}  sha256:${TABL
 const t0 = Date.now();
 const run = await runAgent({
   model,
-  taskPath,
+  prepared,
   price,
   provider,
   baseUrl,
@@ -76,7 +91,7 @@ cost/1k gas  $${((run.usd / Math.max(g.saved_total, 1)) * 1000).toFixed(8)} per 
   const receipt = await buildReceipt({
     run,
     spec,
-    taskSource: readFileSync(taskPath, 'utf8'),
+    taskSource: prepared.taskSource,
     taskPath,
     payment: run.payments?.[0] ?? null,
     payments: run.payments,
