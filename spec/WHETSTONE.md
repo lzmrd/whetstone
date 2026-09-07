@@ -56,27 +56,55 @@ A target must satisfy three things at once. A review named this and the specs ha
 | **(b)** | Tractable for symbolic equivalence |
 | **(c)** | Hand-mutable while preserving difficulty |
 
-`mulDiv` maximizes (a) and fails (b) and (c). Five candidates were measured on day 1
-([spike results](spike/DAY1-RESULTS.md)):
+Seven candidates were measured on day 1 ([spike results](spike/DAY1-RESULTS.md)),
+over the exhaustive `boundary/v1` scenario — 769 inputs.
 
-| Target | Verdict | Headroom |
-|---|---|---|
-| **`log2`** ✅ **primary** | proven equivalent, complete exploration | 19% (52 gas/call) |
-| **`log256`** ✅ secondary | proven equivalent, complete exploration | 12% |
-| `sqrt`, `log10` | partial exploration → `UNKNOWN` | — |
-| `mulDiv` | **not** equivalent, counterexample | large, but semantics-laden |
+| Target | Verdict | Gas/call | Total gap |
+|---|---|---|---|
+| **`toHexString`** ✅ **headroom target** | partial exploration → `FUZZED` | **7 596** | 5 841 982 |
+| **`log256`** ✅ **formal target** | proven equivalent, complete | 32 | 25 237 |
+| `log2` | proven equivalent, complete | 18 | 14 446 |
+| `toString` | partial exploration | 486 | — |
+| `sqrt`, `log10` | partial exploration | — | — |
+| `mulDiv` | **not** equivalent, counterexample | — | semantics-laden |
 
-⚠️ **Headroom on `log2` is 52 gas.** Real but small, so the denominator is coarse:
-a model saving 20 gas scores 38%. **Show the quantization, do not smooth it.**
+⚠️ **High headroom and symbolic tractability did not coexist in any candidate.**
+The trilemma does not break; it is navigated by carrying **two targets with two
+different labels**. A guarantee vocabulary that only ever prints one label is
+decoration.
 
-💡 **On `log2` and `log256`, OZ and solady are proven equivalent**, so the baseline is
-solady itself — externally authored, not written by us. Circularity and the
-hand-writing burden both disappear for the unmutated baseline; `restored_M` is still
-hand-written but over a far simpler function.
+### Admission rule — pre-declared, before any measured run
 
-**`mulDiv` stays in as the Branch B by-product**: it is *not* equivalent
-(`Panic(0x12)` vs `FullMulDivFailed()`), so it carries the measured price of
-semantics. Both branches exist, on different functions.
+> Primary metric is **absolute gas over the fixed scenario**. Percentage is derived
+> and secondary: with gaps of tens of gas, a percentage has ridiculous resolution
+> and invites cherry-picking the function.
+
+⚠️ On `log256` the input-dependent spread (81 gas) **exceeds** the mean saving (32).
+Gas is deterministic per input, so a fixed scenario still gives an exact total — but
+**report total plus min/max/spread, never a bare mean**, because a patch can improve
+some inputs and worsen others and net out ambiguously.
+
+### Baseline construction — bilateral mutation
+
+⚠️ Earlier drafts claimed that because OZ and solady are proven equivalent on these
+targets, the baseline is third-party and "circularity disappears". **That was an
+overclaim.** It holds only until you mutate — and R4 requires mutation. Once mutated,
+a hand-written baseline could be made deliberately slow to inflate the denominator.
+
+The construction that keeps the third-party efficiency anchor:
+
+```
+M applied by hand to BOTH sides:
+    OZ_f      ──M──►  OZ_M
+    solady_f  ──M──►  solady_M
+proof: hevm(solady_M ≡ OZ_M)        ← seconds on log256
+baseline = solady_M ,  task = OZ_M
+```
+
+The efficient code still comes from Vectorized; we only apply `M`, and the
+equivalence is machine-checked. **Both mutants are published side by side**, so
+nobody has to take our word that the baseline was not shaped to flatter or
+punish a model.
 
 ---
 
