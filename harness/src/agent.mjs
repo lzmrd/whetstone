@@ -17,35 +17,70 @@ import { SYSTEM_PROMPT, PROMPT_HASH, assertClean, stripComments } from './prompt
 import { extractSolidity } from './extract.mjs';
 import { compileToRuntime, PINS } from './compile.mjs';
 import { equivalent, counterexampleFor } from './equivalence.mjs';
+import { measurePatch } from './gas.mjs';
 
 /** §5: identical across all models and seeds. Changing one breaks comparability. */
 export const INTERFACE = {
   max_rounds: 8,
   budget_usd_per_run: 0.05,
+  // ⚠️ Part of the declared interface, like max_rounds -- NOT a tuning knob.
+  // Reasoning models spend most of their budget thinking: gpt-oss-20b produced
+  // 23 000 characters of reasoning and no answer, which the loop first recorded
+  // as a format failure by the MODEL when it was truncation caused by OUR
+  // ceiling. Truncation is now its own outcome, and comparable across models
+  // precisely because the ceiling is fixed.
+  // 6 000 rather than 8 000 because Groq's free tier caps a whole minute at
+  // 8 000 tokens, prompt included, so a larger ceiling makes the request itself
+  // unservable (HTTP 413).
+  max_tokens: 6000,
   prompt_hash: PROMPT_HASH,
 };
 
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 
-async function callModel({ baseUrl, apiKey, model, messages }) {
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages }),
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} from ${model}: ${(await res.text()).slice(0, 300)}`);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * ⚠️ A rate limit is OUR infrastructure problem, not the model's answer. Retried
+ * with the delay the provider asks for, and the attempt is not counted as a
+ * round -- otherwise a busy provider would show up in the results as a model
+ * that failed the task.
+ */
+async function callModel({ baseUrl, apiKey, model, messages, maxTokens, log }) {
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, messages, max_tokens: maxTokens }),
+    });
+
+    if (res.status === 429) {
+      const body = await res.text();
+      const s = Number(body.match(/try again in ([\d.]+)s/)?.[1] ?? 0);
+      const wait = Math.min(Math.ceil((s || 5 * attempt) * 1000) + 500, 65000);
+      log?.(0, 'ratelimit', `waiting ${(wait / 1000).toFixed(1)}s (attempt ${attempt}/4, not counted as a round)`);
+      await sleep(wait);
+      continue;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status} from ${model}: ${(await res.text()).slice(0, 300)}`);
+
+    const json = await res.json();
+    const choice = json.choices?.[0] ?? {};
+    const usage = json.usage ?? {};
+    return {
+      reply: choice.message?.content ?? '',
+      // Reasoning models put chain-of-thought here. It is NOT an answer, but its
+      // presence distinguishes "produced nothing" from "reasoned past the limit".
+      reasoning: choice.message?.reasoning ?? choice.message?.reasoning_content ?? '',
+      finish: choice.finish_reason ?? 'unknown',
+      tokensIn: usage.prompt_tokens ?? usage.input_tokens ?? 0,
+      tokensOut: usage.completion_tokens ?? usage.output_tokens ?? 0,
+      // ⚠️ Missing usage is not a warning. Without it the cost column does not
+      // exist for this model, and the cost column is half the thesis.
+      metered: Boolean(usage.prompt_tokens ?? usage.input_tokens),
+    };
   }
-  const json = await res.json();
-  const usage = json.usage ?? {};
-  return {
-    reply: json.choices?.[0]?.message?.content ?? '',
-    tokensIn: usage.prompt_tokens ?? usage.input_tokens ?? 0,
-    tokensOut: usage.completion_tokens ?? usage.output_tokens ?? 0,
-    // ⚠️ Missing usage is not a warning. Without it the cost column does not
-    // exist for this model, and the cost column is half the thesis.
-    metered: Boolean(usage.prompt_tokens ?? usage.input_tokens),
-  };
+  throw new Error(`rate limited by ${model} after 4 attempts`);
 }
 
 /**
@@ -60,6 +95,7 @@ export async function runAgent({
   price = { input: 0, output: 0 },
   maxRounds = INTERFACE.max_rounds,
   budgetUsd = INTERFACE.budget_usd_per_run,
+  maxTokens = INTERFACE.max_tokens,
   baseUrl = process.env.OPENCODE_BASE_URL ?? 'https://opencode.ai/zen/v1',
   apiKey = process.env.OPENCODE_API_KEY,
   log = () => {},
@@ -118,7 +154,7 @@ export async function runAgent({
   for (let round = 1; round <= maxRounds; round++) {
     let call;
     try {
-      call = await callModel({ baseUrl, apiKey, model, messages });
+      call = await callModel({ baseUrl, apiKey, model, messages, maxTokens, log });
     } catch (e) {
       run.rounds.push({ round, outcome: 'provider_error', detail: e.message });
       run.stop_reason = 'provider_error';
@@ -131,6 +167,21 @@ export async function runAgent({
     if (!call.metered) run.metered = false;
 
     messages.push({ role: 'assistant', content: call.reply });
+
+    // ── truncation is ours, not theirs ───────────────────────────────────
+    if (call.reply.trim() === '' && (call.finish === 'length' || call.reasoning)) {
+      const why = call.finish === 'length'
+        ? `output truncated at ${call.tokensOut} tokens (${call.reasoning.length} chars of reasoning, no answer)`
+        : 'returned reasoning but no answer';
+      log(round, 'truncated', why);
+      run.rounds.push({ round, outcome: 'truncated', detail: why });
+      messages.push({
+        role: 'user',
+        content: 'Your reply was cut off before any code. Answer with the solidity block only, no explanation.',
+      });
+      if (run.usd >= budgetUsd) { run.stop_reason = 'budget'; return run; }
+      continue;
+    }
 
     // ── gate 0: is there a file in there at all? ─────────────────────────
     const got = extractSolidity(call.reply);
@@ -163,8 +214,11 @@ export async function runAgent({
         const eq = await equivalent(built.path, taskBuild.path, sig);
         if (eq.equivalent === true) {
           log(round, 'proved', eq.label);
-          run.rounds.push({ round, outcome: 'proved', label: eq.label });
+          const gas = await measurePatch(taskBuild.path, built.path);
+          log(round, 'gas', `${gas.saved_per_call} gas/call saved, max regression ${gas.patch_max_regression}`);
+          run.rounds.push({ round, outcome: 'proved', label: eq.label, gas });
           run.patch = { source: got.source, runtime: built.runtime, path: built.path, label: eq.label };
+          run.gas = gas;
           run.stop_reason = 'proved';
           return run;
         }

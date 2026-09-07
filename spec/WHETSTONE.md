@@ -312,6 +312,7 @@ the gas number. No hints, no guidance, nothing hand-written per model.
 | Parameter | Value |
 |---|---|
 | `max_rounds` | **8** |
+| `max_tokens` per reply | **6 000**. ⚠️ Part of the interface, not a knob. A reasoning model that never reaches an answer inside it earns the outcome `truncated`, which is comparable across models *because* the ceiling is fixed. Set below Groq's free-tier 8 000-tokens-per-minute cap, which counts the prompt too |
 | `budget_usd_per_run` | **0.05** at list price, whichever binds first |
 | `temperature` | provider default, recorded in the receipt |
 | System prompt | one, fixed, committed in the repo and hashed into the receipt |

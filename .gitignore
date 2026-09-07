@@ -20,6 +20,9 @@ dist/
 subgraph/build/
 subgraph/generated/
 
+# model patches and compiled runtime bytecode, per run
+.run/
+
 # harness local state (source of truth for retries, but not committed)
 harness/.runs/
 

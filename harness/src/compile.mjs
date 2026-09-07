@@ -15,9 +15,19 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { writeFile, mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { writeFile, mkdtemp, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * Build artifacts land in <repo>/.run, not the system temp directory.
+ *
+ * ⚠️ Not a preference. Foundry refuses `vm.readFile` outside the paths granted
+ * in foundry.toml's fs_permissions, and granting /tmp would hand every test in
+ * the project read access to the whole machine. One project-local directory,
+ * gitignored, is the least privilege that works.
+ */
+const RUN_DIR = join(fileURLToPath(new URL('../../', import.meta.url)), '.run');
 
 const run = promisify(execFile);
 
@@ -33,7 +43,8 @@ export const PINS = {
  * @returns {Promise<{ok: true, runtime: string, path: string} | {ok: false, errors: string}>}
  */
 export async function compileToRuntime(source, contractName) {
-  const dir = await mkdtemp(join(tmpdir(), 'whetstone-'));
+  await mkdir(RUN_DIR, { recursive: true });
+  const dir = await mkdtemp(join(RUN_DIR, 'c-'));
   const file = join(dir, `${contractName}.sol`);
   await writeFile(file, source);
 
@@ -84,5 +95,5 @@ export async function compileToRuntime(source, contractName) {
 
 /** Temp paths leak nothing useful and waste the model's context. */
 function stripPaths(s) {
-  return s.replace(/\/[^\s:]*whetstone-[^\s:]*\//g, '').slice(0, 4000);
+  return s.replace(/\/[^\s:]*\.run\/[^\s:]*\//g, '').slice(0, 4000);
 }

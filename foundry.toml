@@ -20,6 +20,10 @@ optimizer_runs = 200
 # hash of the SOURCE TEXT, so identical logic in differently-formatted files
 # compiles to different bytecode -- which would defeat third-party recomputation.
 bytecode_hash = 'none'
+# The harness compiles model patches into .run/ and PatchGas.t.sol reads the
+# runtime bytecode from there. Least privilege: one project-local directory,
+# never /tmp, which would grant every test read access to the whole machine.
+fs_permissions = [{ access = 'read', path = './.run' }]
 
 # Differential fuzzing gate (level 2)
 [profile.default.fuzz]

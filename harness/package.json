@@ -10,7 +10,8 @@
     "model:smoke": "node --env-file=../.env src/model-smoke.mjs",
     "models": "node --env-file=../.env src/list-models.mjs",
     "agent": "node --env-file=../.env src/run.mjs",
-    "access": "node --env-file=../.env src/access-probe.mjs"
+    "access": "node --env-file=../.env src/access-probe.mjs",
+    "prices:sync": "node --env-file=../.env src/sync-prices.mjs"
   },
   "dependencies": {
     "@x402/hedera": "^2.25.0"

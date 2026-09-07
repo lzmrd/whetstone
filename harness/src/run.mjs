@@ -56,6 +56,15 @@ cost         $${run.usd.toFixed(6)} at list price${run.metered ? '' : '   ⚠️
 if (run.patch) {
   console.log(`guarantee    ${run.patch.label}`);
   console.log(`bytecode     ${run.patch.runtime.length / 2} bytes`);
+  if (run.gas) {
+    const g = run.gas;
+    console.log(`
+scenario     ${g.scored} scored / ${g.skipped} skipped of ${g.scenario_inputs}
+gas total    ${g.v1_total} (task)  ->  ${g.patch_total} (patch)
+saved        ${g.saved_total} total, ${g.saved_per_call} per call
+regression   ${g.patch_max_regression} max, on ${g.patch_regressed_inputs} input(s)   <- mandatory column
+cost/1k gas  $${((run.usd / Math.max(g.saved_total, 1)) * 1000).toFixed(8)} per 1k gas saved`);
+  }
   console.log(`\n${run.patch.source}\n`);
   if (run.patch.label === 'UNKNOWN') {
     console.log('⚠️  The prover did not terminate. This is NOT evidence of equivalence.\n');

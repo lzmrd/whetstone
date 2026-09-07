@@ -1,7 +1,7 @@
 {
   "_comment": "Provider registry and pinned price table. Prices are NOT fetchable at runtime: the endpoints return no pricing, so every figure here is transcribed by hand from the provider's published page, with that URL and the retrieval date recorded. Every receipt carries this file's version and sha256.",
   "_unit": "USD per 1M tokens",
-  "_version": 2,
+  "_version": 3,
   "_rule": "A model with no entry here cannot be metered and MUST NOT appear in the leaderboard. usd_list is 'what this would cost anyone' at published list price -- it is NOT what we paid. A call served by a free tier still reports the published list price, and the actual spend of zero is a separate fact.",
   "providers": {
     "opencode": {
@@ -9,7 +9,7 @@
       "key_env": "OPENCODE_API_KEY",
       "source": "https://opencode.ai/docs/zen/",
       "retrieved": "2026-09-06",
-      "status": "BLOCKED \u2014 GATE 0, 7 Sep: free tier is client-only and the API refuses it; paid models report an empty balance",
+      "status": "BLOCKED — GATE 0, 7 Sep: free tier is client-only and the API refuses it; paid models report an empty balance",
       "models": {
         "minimax-m3": {
           "input": 0.3,
@@ -27,39 +27,39 @@
           "cached_read": 0.06
         },
         "big-pickle": {
-          "input": 0.0,
-          "output": 0.0,
-          "cached_read": 0.0
+          "input": 0,
+          "output": 0,
+          "cached_read": 0
         },
         "mimo-v2.5-free": {
-          "input": 0.0,
-          "output": 0.0,
-          "cached_read": 0.0
+          "input": 0,
+          "output": 0,
+          "cached_read": 0
         },
         "ling-3.0-flash-fin-free": {
-          "input": 0.0,
-          "output": 0.0,
-          "cached_read": 0.0
+          "input": 0,
+          "output": 0,
+          "cached_read": 0
         },
         "nemotron-3-ultra-free": {
-          "input": 0.0,
-          "output": 0.0,
-          "cached_read": 0.0
+          "input": 0,
+          "output": 0,
+          "cached_read": 0
         },
         "nemotron-3.5-lightning-free": {
-          "input": 0.0,
-          "output": 0.0,
-          "cached_read": 0.0
+          "input": 0,
+          "output": 0,
+          "cached_read": 0
         },
         "muse-spark-1.3-contributor-free": {
-          "input": 0.0,
-          "output": 0.0,
-          "cached_read": 0.0
+          "input": 0,
+          "output": 0,
+          "cached_read": 0
         },
         "deepseek-v4-flash-free": {
-          "input": 0.0,
-          "output": 0.0,
-          "cached_read": 0.0
+          "input": 0,
+          "output": 0,
+          "cached_read": 0
         }
       }
     },
@@ -67,17 +67,51 @@
       "base_url": "https://api.groq.com/openai/v1",
       "key_env": "GROQ_API_KEY",
       "source": "https://groq.com/pricing/",
-      "retrieved": null,
-      "status": "CANDIDATE \u2014 open-weight only (Llama, Qwen, Gemma, Mixtral), OpenAI-compatible",
-      "models": {}
+      "retrieved": "2026-09-07",
+      "status": "ACTIVE — 3 model(s) selected: open-weight only, R14 reviewers excluded",
+      "models": {
+        "openai/gpt-oss-120b": {
+          "input": 0.15,
+          "output": 0.6,
+          "cached_read": 0.075
+        },
+        "openai/gpt-oss-20b": {
+          "input": 0.075,
+          "output": 0.3,
+          "cached_read": 0.0375
+        },
+        "qwen/qwen3.6-27b": {
+          "input": 0.6,
+          "output": 3,
+          "cached_read": 0.3
+        }
+      },
+      "price_origin": "fetched from the provider /models endpoint, then pinned"
     },
     "openrouter": {
       "base_url": "https://openrouter.ai/api/v1",
       "key_env": "OPENROUTER_API_KEY",
       "source": "https://openrouter.ai/models",
-      "retrieved": null,
-      "status": "CANDIDATE \u2014 many open-weight models carry a :free variant; availability rotates, so probe before every batch",
-      "models": {}
+      "retrieved": "2026-09-07",
+      "status": "ACTIVE — 3 model(s) selected: open-weight only, R14 reviewers excluded",
+      "models": {
+        "google/gemma-4-31b-it:free": {
+          "input": 0,
+          "output": 0,
+          "cached_read": null
+        },
+        "nvidia/nemotron-3-super-120b-a12b:free": {
+          "input": 0,
+          "output": 0,
+          "cached_read": null
+        },
+        "minimax/minimax-m3:free": {
+          "input": 0,
+          "output": 0,
+          "cached_read": null
+        }
+      },
+      "price_origin": "fetched from the provider /models endpoint, then pinned"
     }
   }
 }
