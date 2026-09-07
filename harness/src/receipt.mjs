@@ -78,6 +78,12 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
           // number here would invent a denominator.
           baseline_total: run.gas.baseline_total ?? null,
           relative_progress: run.gas.relative_progress ?? null,
+          // ⚠️ Part of the gap is a dead overflow check that a one-word edit
+          // removes. Without this a model scoring at the floor looks like it
+          // optimised something; it may have understood nothing.
+          trivial_total: run.trivial_total ?? null,
+          trivial_saves_per_call: run.trivial_saves_per_call ?? null,
+          beats_trivial_by: run.gas.beats_trivial_by ?? null,
         }
       : null,
 
@@ -96,6 +102,7 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
           // task == original, or prepareTask throws and nothing is scored.
           mutation_refuted: run.mutation_refuted === true,
           proof_1_baseline_equals_task: run.proof_1 ?? null,
+          proof_3_trivial_equals_task: run.proof_3 ?? null,
         }
       : null,
 

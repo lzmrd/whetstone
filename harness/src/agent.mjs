@@ -166,12 +166,14 @@ export async function runAgent({
   log = () => {},
 }) {
   if (!prepared) throw new Error('runAgent needs a task prepared by prepareTask(): both proofs must be checked first');
-  const { taskSource, task: taskBuild, baseline } = prepared;
+  const { taskSource, task: taskBuild, baseline, trivial } = prepared;
   assertClean(SYSTEM_PROMPT, 'system prompt');
 
   // The denominator, measured once per run against the same instrument the
   // patch will be measured with.
   const baselineGas = await measurePatch(taskBuild.path, baseline.path);
+  // The floor: what a one-word edit recovers, measured once with the same instrument.
+  const trivialGas = trivial ? await measurePatch(taskBuild.path, trivial.path) : null;
 
   const messages = [
     { role: 'system', content: SYSTEM_PROMPT },
@@ -192,7 +194,10 @@ export async function runAgent({
     task_id: prepared.manifest.id,
     mutation_refuted: prepared.mutation_refuted,
     baseline_total: baselineGas.patch_total,
+    trivial_total: trivialGas?.patch_total ?? null,
+    trivial_saves_per_call: trivialGas?.saved_per_call ?? null,
     proof_1: prepared.proof_1,
+    proof_3: prepared.proof_3,
     toolchain: { ...PINS },
     rounds: [],
     tokens_in: 0,
@@ -285,7 +290,13 @@ export async function runAgent({
           const denom = gas.v1_total - baselineGas.patch_total;
           gas.baseline_total = baselineGas.patch_total;
           gas.relative_progress = denom > 0 ? Number((gas.saved_total / denom).toFixed(4)) : null;
-          log(round, 'gas', `${gas.saved_per_call} gas/call saved, max regression ${gas.patch_max_regression}, ${(gas.relative_progress * 100).toFixed(1)}% of baseline`);
+          // ⚠️ The number that says whether anything was understood.
+          gas.trivial_saves_per_call = trivialGas?.saved_per_call ?? null;
+          gas.beats_trivial_by = trivialGas ? gas.saved_per_call - trivialGas.saved_per_call : null;
+          log(round, 'gas',
+            `${gas.saved_per_call} gas/call saved, max regression ${gas.patch_max_regression}, ` +
+            `${(gas.relative_progress * 100).toFixed(1)}% of baseline` +
+            (gas.beats_trivial_by != null ? `, ${gas.beats_trivial_by >= 0 ? '+' : ''}${gas.beats_trivial_by} vs the one-word edit` : ''));
           run.rounds.push({ round, outcome: 'proved', label: eq.label, gas });
           run.patch = { source: got.source, runtime: built.runtime, path: built.path, label: eq.label };
           run.gas = gas;

@@ -340,6 +340,32 @@ relative progress = ────────────────────
 
 v1 = `OZ_M` (the task) · baseline = `solady_M` (solady under the same mutation)
 
+### The trivial floor — a second reference, below the metric
+
+⚠️ **A percentage cannot say whether anything was understood.** Part of any real
+gap is recoverable without understanding the function at all. On
+`log256-bytelen/v1` the task computes `r + 1` where `r ≤ 31`, so the addition can
+never overflow — yet Solidity emits an overflow check the optimizer cannot prove
+dead. Wrapping it in `unchecked` recovers **69 of the 283 gas per call, 24% of the
+whole gap**, and requires nothing but the word.
+
+```
+283 gas/call available
+ ├──  69   one word          ← the floor
+ └── 214   the algorithm
+```
+
+So every row carries **`vs floor`** beside the percentage, and a third proof
+obligation guards it:
+
+> `hevm(Trivial ≡ Candidate)` **must PASS**. Not ceremony: if it fails the check
+> is not dead, those gas buy real behaviour, and the floor would understate every
+> model.
+
+A run at or below the floor did nothing interesting, however good its percentage
+looks. Observed immediately — one seed returned a **proved-equivalent** patch that
+saved **0 gas, sat 69 below the floor, and regressed one input by 185**.
+
 ⚠️ **The baseline is not a ceiling.** Values **above 100% are expected and legitimate**: the patch beat the baseline, it did not violate a limit. Row labelled *"beats baseline"*, reinforced verification, and the patch becomes the new reference.
 
 ---

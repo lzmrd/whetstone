@@ -32,7 +32,11 @@ export async function prepareTask(manifest) {
   const task = await compileToRuntime(taskSource, manifest.task.contract);
   const baseline = await compileToRuntime(stripComments(read(manifest.baseline.path)), manifest.baseline.contract);
   const original = await compileToRuntime(stripComments(read(manifest.original.path)), manifest.original.contract);
-  for (const [name, b] of [['task', task], ['baseline', baseline], ['original', original]]) {
+  const trivial = manifest.trivial
+    ? await compileToRuntime(stripComments(read(manifest.trivial.path)), manifest.trivial.contract)
+    : null;
+  for (const [name, b] of [['task', task], ['baseline', baseline], ['original', original],
+                           ...(trivial ? [['trivial', trivial]] : [])]) {
     if (!b.ok) throw new Error(`${name} does not compile:\n${b.errors}`);
   }
 
@@ -73,9 +77,30 @@ export async function prepareTask(manifest) {
     );
   }
 
+  /**
+   * proof 3 — the trivial floor must be PROVED identical to the task.
+   *
+   * ⚠️ Not ceremony. The floor claims that a one-word edit recovers 69 gas while
+   * changing nothing. If hevm refuses, the removed check was NOT dead, those gas
+   * were buying real behaviour, and the reference would understate every model.
+   */
+  let proof_3 = null;
+  if (trivial) {
+    const p3 = await equivalent(trivial.path, task.path, sig);
+    if (p3.equivalent !== true) {
+      throw new Error(
+        `proof 3 FAILED (${p3.label}): the trivial floor is not equivalent to the task, so the ` +
+          `edit it represents changes behaviour and cannot serve as a floor.`,
+      );
+    }
+    proof_3 = p3.label;
+  }
+
   return {
     manifest,
     kind,
+    trivial,
+    proof_3,
     taskSource,
     task,
     baseline,

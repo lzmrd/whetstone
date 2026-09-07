@@ -94,7 +94,10 @@ for (let seed = 1; seed <= n; seed++) {
     continue;
   }
   console.log(
-    `${String(g.saved_per_call).padStart(5)} gas/call  reg ${String(g.patch_max_regression).padStart(4)}  ` +
+    `${String(g.saved_per_call).padStart(5)} gas/call  ` +
+      `${String(((g.relative_progress ?? 0) * 100).toFixed(0)).padStart(4)}% of base  ` +
+      `${g.beats_trivial_by != null ? `${g.beats_trivial_by >= 0 ? '+' : ''}${g.beats_trivial_by}`.padStart(5) : '    —'} vs floor  ` +
+      `reg ${String(g.patch_max_regression).padStart(4)}  ` +
       `${run.rounds.length} round(s)  $${run.usd.toFixed(6)}  ${run.patch.label}`,
   );
   results.push({ seed, ok: true, run, ...g, usd: run.usd, label: run.patch.label, rounds: run.rounds.length });
@@ -124,6 +127,17 @@ console.log(`  gas/call         median ${median(saved)}   min ${Math.min(...save
 console.log(`  max regression   median ${median(regs)}   worst ${Math.max(...regs)}          <- mandatory column`);
 console.log(`  cost             median $${median(costs).toFixed(6)}   total $${costs.reduce((a, b) => a + b, 0).toFixed(6)}`);
 if (rel.length) console.log(`  vs baseline      median ${(median(rel) * 100).toFixed(1)}%   (>100% = beat the baseline, expected and legitimate)`);
+
+// ⚠️ The floor answers what the percentage cannot: did the model do better than a
+// one-word edit? Part of the gap is a dead overflow check the compiler cannot
+// remove; recovering it needs no understanding of the function.
+const floor = ok[0]?.run?.trivial_saves_per_call ?? null;
+if (floor != null) {
+  const beats = ok.map((r) => r.beats_trivial_by).filter((x) => x != null);
+  const below = ok.filter((r) => r.saved_per_call <= floor).length;
+  console.log(`  trivial floor    ${floor} gas/call — recoverable by one word, no understanding required`);
+  console.log(`  vs floor         median ${median(beats) >= 0 ? '+' : ''}${median(beats)}   ${below} of ${ok.length} run(s) did NOT beat the one-word edit`);
+}
 console.log(`  labels           ${[...new Set(ok.map((r) => r.label))].join(', ')}`);
 
 // ── R6: the machine-readable half of the leaderboard ─────────────────────
@@ -153,12 +167,16 @@ writeFileSync(outFile, JSON.stringify({
     labels: [...new Set(ok.map((r) => r.label))],
     // Non-null only when some run actually earned FUZZED.
     fuzz_campaign: ok.find((r) => r.label === 'FUZZED')?.run?.fuzz_campaign ?? null,
+    trivial_floor_per_call: ok[0]?.run?.trivial_saves_per_call ?? null,
+    runs_not_beating_trivial: ok.filter((r) => r.run?.trivial_saves_per_call != null
+      && r.saved_per_call <= r.run.trivial_saves_per_call).length,
     // ⚠️ Carried explicitly so a consumer cannot summarise it away.
     spread_crosses_zero: Math.min(...saved) < 0 && Math.max(...saved) > 0,
   },
   runs: results.map((r) => r.ok
     ? { seed: r.seed, ok: true, saved_per_call: r.saved_per_call, saved_total: r.saved_total,
         max_regression: r.patch_max_regression, regressed_inputs: r.patch_regressed_inputs,
+        beats_trivial_by: r.beats_trivial_by ?? null,
         relative_progress: r.relative_progress, label: r.label, rounds: r.rounds, usd: r.usd }
     : { seed: r.seed, ok: false, reason: r.reason, rounds: r.rounds ?? 0 }),
   generated_at: new Date().toISOString(),

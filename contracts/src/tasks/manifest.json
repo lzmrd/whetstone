@@ -25,5 +25,11 @@
     "proof_1_baseline_equals_task": "must PASS",
     "proof_2_task_differs_from_original": "must REFUTE (kind=semantic)"
   },
-  "kind": "semantic"
+  "kind": "semantic",
+  "trivial": {
+    "path": "contracts/src/tasks/Trivial.sol",
+    "contract": "Trivial",
+    "description": "the task with the dead overflow check removed -- one word, no understanding required",
+    "proof_3_trivial_equals_task": "must PASS (if it fails the check is not dead and this reference is invalid)"
+  }
 }
