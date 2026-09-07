@@ -4,7 +4,9 @@
 
 Whetstone runs open-weight models against Solidity optimization tasks under a real, on-chain budget, and reports three things together: **how much gas was saved**, **what it cost to get there**, and **what level of correctness guarantee actually backs each patch**.
 
-> 🚧 **Status: day 0.** Repository scaffolding and specification. No product code yet.
+> 🚧 **Status: day 1 complete.** Specification, measurement harness and equivalence
+> gate are standing and self-checked; the agent loop, payments-per-round and
+> on-chain records are not built yet.
 > Built for [ETHOnline 2026](https://ethglobal.com/events/ethonline2026), Start Fresh track. Solo builder.
 
 ---
@@ -28,7 +30,9 @@ Optimizing gas with an LLM is well-trodden ground, and we are not first:
 | [GasAgent](https://arxiv.org/abs/2507.15761) | Jul 2025 | 82/100 contracts optimized, 9.97% average deployment saving |
 | [*RAGas: Retrieval-Augmented Gas Optimization for Smart Contracts*](https://arxiv.org/abs/2608.15857) | Aug 2026 | Up to 11%, "preserving functional equivalence" |
 
-**What Whetstone adds**: machine-checked equivalence as a *gate with a labelled guarantee*; inference **cost** tied to that guarantee; **third-party verifiability** (published receipts, serialized toolchain); and a measurement of *the price of the semantics solady dropped*.
+**What Whetstone adds**: machine-checked equivalence as a *gate with a labelled guarantee*; inference **cost** tied to that guarantee; and **third-party verifiability** — published receipts, serialized toolchain, and a scenario identified by the hash of its input vector rather than by a name.
+
+⚠️ A fourth claim, *"a measurement of the price of the semantics solady dropped"*, was carried in earlier drafts and is **withdrawn**. It rested on `mulDiv`, the one target where the semantics genuinely differ, and the arithmetic there is `UNKNOWN`: the solver exhausts memory both unconditionally and on the guarded domain. A gas delta between implementations not shown to compute the same thing is not a price.
 
 ---
 
@@ -95,7 +99,9 @@ Every model call is paid for on-chain, per call, before the response is used.
      to our gateway, which then proxies the inference call
 ```
 
-**Pricing is pass-through.** The amount is computed as `tokens × published list price`, fetched at runtime from the provider's model catalogue and written into the receipt. The subscription used to fund the calls is not what is reported: the reported cost is the list-price equivalent, so the number means "what this would cost anyone", not "what we happened to pay".
+**Pricing is pass-through.** The amount is computed as `tokens × published list price` and written into the receipt. The subscription used to fund the calls is not what is reported: the reported cost is the list-price equivalent, so the number means "what this would cost anyone", not "what we happened to pay".
+
+⚠️ **The list price is pinned by hand, not fetched.** The provider's `/v1/models` endpoint returns only `id`, `object`, `created`, `owned_by` — **no pricing**. Prices live in `harness/src/prices.json` with source URL, retrieval date, version and sha256, and that hash goes into the receipt. A model with no price entry cannot be metered and does not appear in the leaderboard.
 
 ---
 

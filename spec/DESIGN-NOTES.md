@@ -26,7 +26,7 @@ Wall-clock on shared hardware never reproduces. Gas is deterministic **given a c
 
 ## Why baseline, not ceiling
 
-`restored_M_f` is not an upper bound. It can be slower than:
+`solady_M` — solady's implementation under the hand-written mutation `M` — is not an upper bound. It can be slower than:
 
 - a different equivalent implementation the agent finds
 - OpenZeppelin itself, in that specific variant
@@ -193,8 +193,8 @@ n=5 is therefore a **feasibility** choice, not a power choice: it gives median a
 
 | | **Track S — Synthetic** | **Track H — Historical** |
 |---|---|---|
-| Baseline | hand-written `restored_M_f` | merged human commit |
-| Denominator | `gas(variant) − gas(restored_M)` | `gas(before) − gas(human commit)` |
+| Baseline | `solady_M` — solady under the hand-written mutation `M` | merged human commit |
+| Denominator | `gas(OZ_M) − gas(solady_M)` | `gas(before) − gas(human commit)` |
 | Task | semantically mutated variant | before/after pair from real repos |
 | Scale | 1-5 | 50-300+ |
 | Anti-contamination | semantic mutation | freshness + leakage filters |
@@ -214,7 +214,9 @@ n=5 is therefore a **feasibility** choice, not a power choice: it gives median a
 
 ---
 
-Track S has a single bottleneck: **as long as a person hand-writes `restored_f` and `restored_M_f` for every task, you cannot go past a few dozen**. And without tasks there is no leaderboard, however many seeds you add.
+Track S has a single bottleneck: **as long as a person designs and hand-writes the mutation `M` for every task, and applies it to both sides, you cannot go past a few dozen**. And without tasks there is no leaderboard, however many seeds you add.
+
+⚠️ Day 1 made this bottleneck *narrower but not wider*. `restored_f` is gone — OZ and solady are already proven equivalent on the chosen targets — so the chain needs one passing proof instead of two. But `M` itself does not automate: it is the decision about **what makes a task hard**, and a procedural mutation engine that preserves difficulty is the unsolved research this whole track rests on.
 
 ### The unlock: mining real optimizations from repository history
 
@@ -317,7 +319,7 @@ Not "what survives": Track S remains valid as an experimental track in its own r
 | x402 gateway | Makes the agent's inference cost visible |
 | Subgraph | Indexes runs, enables analysis by family, model, guarantee |
 | Guarantee vocabulary | **The real contribution**, unchanged |
-| Manual `restored_M` | Not needed in the mined track; stays for synthetic tasks |
+| Manual mutation `M` | Not needed in the mined track; stays for synthetic tasks |
 | Semantic mutation | Demoted to a secondary defence |
 | Fixed variant per function | Disappears: it existed only because N was small |
 

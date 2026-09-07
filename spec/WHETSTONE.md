@@ -21,7 +21,7 @@ Whetstone has **two tracks with different architectures**. Conflating them is an
 | | **Track S — Synthetic** | **Track H — Historical** |
 |---|---|---|
 | Purpose | Demonstrate the pipeline | Build the actual benchmark |
-| Baseline | `restored_M_f`, **hand-written** | The **merged human commit** |
+| Baseline | `solady_M` — solady under the **hand-written** mutation `M` | The **merged human commit** |
 | Task | Semantically mutated variant | before/after pair from real repos |
 | Scale | 1-5 tasks | 50-300+ |
 | Anti-contamination | Semantic mutation | Post-cutoff freshness + leakage filters |
@@ -64,7 +64,7 @@ over the exhaustive `boundary/v1` scenario — 769 inputs.
 | **`toHexString`** ✅ **headroom target** | partial exploration → `FUZZED` | **7 703** | 5 923 872 | 15 710 |
 | **`log256`** ✅ **formal target** | proven equivalent, complete | 66 | 50 754 | 0 |
 | `log2` | proven equivalent, complete | 52 | 39 988 | 0 |
-| `toString` | partial exploration | 486 | — | — |
+| `toString` | partial exploration | 486 ⚠️ | — | — |
 | `sqrt`, `log10` | partial exploration | — | — | — |
 | `mulDiv` | **not** equivalent, counterexample | — | semantics-laden | — |
 
@@ -75,6 +75,10 @@ the delta. Both wrote numbers into this file before the bias was found. The
 current instrument is asserted order-neutral by
 [`OrderControl.t.sol`](../contracts/test/OrderControl.t.sol) on every run.
 Full account and two retracted claims: [spike results, Addendum 4](spike/DAY1-RESULTS.md).
+
+⚠️ The `toString` figure (486) is marked because it was **never re-measured** with
+the current instrument — it comes from a biased one. It is a dropped candidate, so
+it is flagged rather than re-run; it must not be quoted anywhere as a result.
 
 ⚠️ **High headroom and symbolic tractability did not coexist in any candidate.**
 The trilemma does not break; it is navigated by carrying **two targets with two
@@ -164,7 +168,7 @@ punish a model.
 | R1 | **One mutated variant per function**, fixed across all seeds. Seeds vary sampling only |
 | R2 | The mutation **`M`** is the human artifact of Track S, and its authorship is a **declared fact**, not an assumption: hand-written unless [AI_USAGE.md](../AI_USAGE.md) says otherwise. ⚠️ Earlier revisions named `restored_f`/`restored_M_f` — day-1 measurement deleted those artifacts (OZ ≡ solady already holds on the chosen targets), so the rule now attaches to what actually exists. See D-04 |
 | R3 | The **mutated variant is the run's v1 reference**. Gates prove against it |
-| R4 | Mutation is **semantic**, never cosmetic |
+| R4 | Mutation is **semantic**, never cosmetic — and this is a **gate, not an intention**: hevm must *refute* `OZ_M ≡ OZ_f`. A cosmetic mutation leaves that equivalence provable, which leaves a memorized answer correct (§4) |
 | R5 | Report **median and dispersion**, never a single value |
 | R6 | MVP leaderboard = **CLI/JSON**. Minimal web view is a judged criterion (see §10) |
 | R7 | **Day 3 is The Graph.** The challenge contract moves to roadmap, and **"the EVM as arbiter" leaves the narrative** |
@@ -179,31 +183,62 @@ punish a model.
 
 ## 4. Per-function pipeline
 
+⚠️ **Rewritten after day 1.** The earlier pipeline built `restored_f` — solady's
+implementation with OpenZeppelin's checks restored — and needed *two* passing
+proofs. Measurement removed it: on the chosen targets OZ and solady are already
+proven equivalent, so there is nothing to restore. See [D-04](DECISIONS.md).
+
 ```
-OZ_f ──(by hand)──> restored_f          proof 1: restored_f ≡ OZ_f
-  │                     │
-  │ mutation M          │ M applied by hand
-  ▼                     ▼
-variant_f ──────── restored_M_f         proof 2: restored_M_f ≡ variant_f
-  (the task)        (the baseline)
+OZ_f      ══(M, by hand)══►  OZ_M        ← the task (v1)
+solady_f  ══(same M)══════►  solady_M    ← the baseline
+
+proof 1, must PASS:    hevm(solady_M ≡ OZ_M)   the baseline computes the task
+proof 2, must REFUTE:  hevm(OZ_M ≡ OZ_f)       M is semantic, not cosmetic
 ```
+
+### Proof 2 is not optional
+
+R4 requires the mutation to be semantic and never cosmetic, and **nothing was
+checking it**. A cosmetic `M` — renames, reordering, a shuffled branch — leaves
+`OZ_M ≡ OZ_f` provable, which means a memorized answer is still a *correct*
+answer and the anti-contamination defence of [D-05](DECISIONS.md) is decoration.
+
+So the mutation carries a **required refutation**: hevm must return a
+counterexample separating `OZ_M` from `OZ_f`. Refutations are cheap — the day-1
+revert probe returned in 0.1 s — so this costs nothing and turns R4 from an
+intention into a gate.
+
+⚠️ A refutation is *necessary, not sufficient*. It proves `M` changed behaviour
+somewhere; it cannot prove the task stayed as hard. Difficulty preservation
+remains unsolved and is declared as a limit, not claimed as a property.
 
 ### The real work for ONE function
 
-Not "two artifacts". A complete chain requires:
-
-1. `restored_f` written by hand
-2. proof `restored_f ≡ OZ_f`
-3. manual semantic variant
-4. `restored_M_f`
-5. proof `restored_M_f ≡ variant_f`
+1. Design `M`, apply it by hand to `OZ_f` → `OZ_M`
+2. Apply the **same** `M` by hand to `solady_f` → `solady_M`
+3. proof 1: `hevm(solady_M ≡ OZ_M)` passes
+4. proof 2: `hevm(OZ_M ≡ OZ_f)` refutes
+5. gas precondition (below)
 6. gas for baseline and v1, differential fuzzing, equivalence check of the patch, runner, x402, HCS receipt
 
-⚠️ **`restored_M_f` does not derive mechanically from `restored_f`.** If M changes a revert condition or a rounding mode, the transformation may hit exactly the assembly the efficiency rests on. **It is manual work**, not propagation.
+⚠️ **`solady_M` does not derive mechanically from `OZ_M`.** If `M` changes a
+revert condition or a rounding mode, the transformation may hit exactly the
+assembly the efficiency rests on. **It is manual work**, not propagation.
+
+💡 One consequence of the rewrite runs in our favour on a five-day schedule: the
+chain now needs **one passing proof instead of two**, because the OZ ≡ solady leg
+was settled by measurement rather than by hand-written code.
 
 ### Precondition
 
-`gas(restored_M_f) < gas(variant_f)`. To be **verified**, not assumed. If it fails → *"denominator not established"* bucket.
+`gas(solady_M) < gas(OZ_M)` over `boundary/v1`, measured by the order-neutral
+instrument (D-14). To be **verified**, not assumed. If it fails → *"denominator
+not established"*, and the mutation is redesigned rather than the number reported.
+
+⚠️ This is also the check that catches an **accidentally inflated denominator**.
+If `M` damaged solady's efficiency, `solady_M` stops being a third-party
+efficiency anchor and quietly becomes a hand-written baseline again — which is
+precisely the circularity the bilateral construction exists to avoid.
 
 ---
 
@@ -264,7 +299,7 @@ relative progress = ────────────────────
                     gas(v1) − gas(baseline)
 ```
 
-v1 = `variant_f` · baseline = `restored_M_f`
+v1 = `OZ_M` (the task) · baseline = `solady_M` (solady under the same mutation)
 
 ⚠️ **The baseline is not a ceiling.** Values **above 100% are expected and legitimate**: the patch beat the baseline, it did not violate a limit. Row labelled *"beats baseline"*, reinforced verification, and the patch becomes the new reference.
 
@@ -477,11 +512,11 @@ Minimal honest deliverable — no oversell:
 **Monday 7 — the spike. ONE function, no product code**
 1. hevm/halmos setup + equivalence wrappers ← *this is the real work, not the CLI command*
 2. Negative test on reverts
-3. One hand-written `restored_f` + proof
+3. ~~One hand-written `restored_f` + proof~~ → **void**: day-1 measurement proved OZ ≡ solady on the chosen targets, so `restored_f` does not exist. Replaced by the bilateral mutation, §4
 4. Outcome `proven`/`fail`/`unknown` → **binary decision: proceed or pivot**
 
 **Tuesday 8 — certified vertical slice**
-Hand-written semantic variant · `restored_M` + proof · gas precondition check · one paid x402 call · gates · HCS receipt · CLI/JSON row
+Hand-written mutation `M` on both sides · proof 1 passes, proof 2 refutes (§4) · gas precondition check · one paid x402 call · gates · HCS receipt · CLI/JSON row
 
 > From here on something exists to present even if everything else collapses.
 
@@ -502,13 +537,14 @@ Final video edit · README with prior art and scope at the top · `AI_USAGE.md` 
 
 ### Dropped from the plan by the calendar cut
 
-Ratchet · procedural mutation engine · control family · cross-family dispersion. All roadmap. The hand-written variant stays: without it there is no anti-memorization defence.
+Ratchet · procedural mutation engine · control family · cross-family dispersion. All roadmap. The hand-written mutation `M` stays: without it there is no anti-memorization defence, and its required refutation (§4) is the only machine-checked part of that defence.
 
 ---
 
 ## 14. Risks
 
-1. **Formal equivalence**, three escalating levels: patch on ordinary Solidity → `OZ ≡ restored` on **assembly** → whether the tool covers **revert payloads**. Without #2 there is no denominator; without #3 reverts drop to gate 2.
+1. **Formal equivalence.** Levels 1 and 3 are **resolved by measurement**: hevm proves `OZ ≡ solady` on `log256`/`log2` in seconds, and it *does* compare revert payloads (D-03). Level 2 is now `hevm(solady_M ≡ OZ_M)` on the mutated pair — **unresolved until `M` exists**, and the risk is that a mutation touching the assembly the efficiency rests on pushes it to `UNKNOWN`, as `mulDiv` already did. Without it there is no denominator.
+   ⚠️ `mulDiv` is the worked example of this risk realised: bitwuzla exhausts memory both unconditionally and on the guarded domain.
 2. **Reduced novelty**: with GasAgent and RAGas published, only the guarantee and cost layer remains.
 3. **Scope**: days 1-2 are almost entirely manual verification. If that base is not standing by the end of day 2, nothing else has anything to rest on.
 4. **Public, repeatable tasks**: R1 makes the task known. The price of tractability, declared.

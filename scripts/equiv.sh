@@ -2,7 +2,8 @@
 # Build two spike contracts, extract their runtime bytecode, and prove or
 # refute equivalence with hevm.
 #
-#   ./scripts/equiv.sh OzMulDiv RestoredMulDiv 'f(uint256,uint256,uint256)'
+#   ./scripts/equiv.sh OzLog256 SdLog256 'f(uint256)'
+#   ./scripts/equiv.sh OzMulDivCond SdMulDivCond 'f(uint256,uint256,uint256)'
 #
 # Env overrides:  SOLVER=z3|bitwuzla  TIMEOUT=<s>  SOLVERS=<n>  MAXITER=<n>
 set -euo pipefail

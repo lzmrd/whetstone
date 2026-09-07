@@ -81,9 +81,9 @@ Machine has 15 GB RAM; ~5 GB free during the runs.
 
 ### Carried into day 2
 
-- [ ] Write `restored_f` by hand: solady's `fullMulDiv` with OZ's `Panic` semantics restored
-- [ ] Attempt `restored_f ≡ OZ` — record whichever label it earns, including `UNKNOWN`
-- [ ] Verify the precondition `gas(restored_M) < gas(variant)`
+- [x] ~~Write `restored_f` by hand~~ — **VOID**. OZ ≡ solady already holds on the chosen targets, so there is nothing to restore ([Addendum 2](#addendum-2--the-measuring-instrument-was-unstable)). Notes archived in [MULDIV-NOTES.md](MULDIV-NOTES.md)
+- [x] ~~Attempt `restored_f ≡ OZ`~~ — **VOID**, same reason. The nearest real question was asked instead and answered `UNKNOWN` ([Addendum 5](#addendum-5--the-muldiv-second-pass-and-what-it-returned))
+- [ ] Verify the precondition — now `gas(solady_M) < gas(OZ_M)`, and not evaluable until `M` exists
 - [ ] If `mulDiv` proves out of reach, fall back to a smaller fixed-size target and say why
 
 ⚠️ **If `UNKNOWN` is the best available on every candidate**, the headline metric loses its denominator and branch B from DESIGN-NOTES applies: the story becomes the price of semantics, measured, rather than the percentage closed.
@@ -157,7 +157,11 @@ compiled code shifts, and the delta absorbs it.
 and measure a `staticcall` to it. Call overhead is constant and cancels in the
 A-vs-B delta. `contracts/test/GasStable.t.sol`.
 
-## Corrected figures, stable method, 10-input fixture
+## Corrected figures, ⚠️ *not* a stable method, 10-input fixture
+
+> "Stable" was wrong. This instrument was order-biased by ~10% of the delta it
+> reported; it simply did not move when unrelated imports changed, which is a
+> weaker property than the one being claimed.
 
 | Target | Verdict | Label | Gas/call saved |
 |---|---|---|---|
@@ -191,7 +195,11 @@ concession.
 
 ---
 
-# Addendum 3 — exhaustive fixtures halved the headroom
+# Addendum 3 — ⚠️ RETRACTED: "exhaustive fixtures halved the headroom"
+
+> The heading is left as it was written so the record is honest, but the claim is
+> false. The halving was gas-instrument bias, not fixture overfitting — see
+> [Addendum 4](#addendum-4--the-instrument-was-biased-twice-and-two-spec-claims-are-withdrawn).
 
 `Scenario.inputs()` — 0, every `2**k` and `2**k ± 1` for k = 0..255, and
 `type(uint256).max`. **769 inputs**, measured in seconds.
@@ -201,6 +209,11 @@ concession.
 | `log2` | 51 | **18** | 46 |
 | `log256` | 66 | **32** | 81 |
 | `toHexString` | 4 833 | **7 596** | 15 994 |
+
+⚠️ **RETRACTED — see [Addendum 4](#addendum-4--the-instrument-was-biased-twice-and-two-spec-claims-are-withdrawn).**
+This was gas-instrument bias, not fixture overfitting. With an order-neutral
+instrument the exhaustive set gives the same 66 gas/call the sparse set gave.
+The original text follows, unedited.
 
 ⚠️ **The sparse fixture set overstated the gap by roughly 2×** on both log targets.
 Fixture-overfitting was already biting our own baseline measurement, before any
@@ -214,6 +227,12 @@ and net out ambiguously, so **report the total over the fixed scenario plus
 min/max/spread**, never a bare mean.
 
 ## Admission rule, pre-declared
+
+⚠️ **Superseded by [Addendum 4](#addendum-4--the-instrument-was-biased-twice-and-two-spec-claims-are-withdrawn).**
+The figures in this section came from a biased instrument, and the rule itself
+was replaced by the fuller scoring rule in WHETSTONE §1 — ranking on the total,
+with max-regression as a mandatory second column. Kept as written, because the
+history of what was believed and when is part of the record.
 
 > A target enters the leaderboard only if its **total gap over `boundary/v1`**
 > is large enough that one gas is a meaningful fraction of it. Primary metric is

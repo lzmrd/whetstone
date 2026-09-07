@@ -40,13 +40,15 @@ One page. No new concepts: everything is extracted from [WHETSTONE.md](WHETSTONE
 
 - Use them **today for building and debugging the harness** — no measurement runs are due until the batch
 - Keeping **one free model in the leaderboard alongside the paid ones makes the cost column more interesting**, not less: *"this model did 40% of the work at zero marginal cost"* is a real finding
-- 💡 **Fetch prices at runtime** from `https://opencode.ai/zen/v1/models` and write them into the receipt. Pass-through pricing then stops being our claim and becomes a retrievable fact
+- ⚠️ **Runtime price fetching is impossible — verified, not assumed.** `GET /v1/models` returns only `id`, `object`, `created`, `owned_by`: **no pricing at all**. Prices therefore live in `harness/src/prices.json`, pinned by hand with source URL, retrieval date, version and sha256, and the hash goes into the receipt. A model with no price entry **cannot be metered and must not appear in the leaderboard**
 
 ⚠️ **`osaka` may outrun the tools.** Symbolic execution engines lag behind hardforks. If hevm/halmos do not support `osaka` on Monday, drop to `cancun` and **declare the divergence from OZ's own config** in the receipt. This is a day-1 spike item, not a config detail.
 
 ⚠️ **Hedera runs Cancun, not osaka** (Besu with modifications: no blobs, Type 3 transactions rejected). It does **not** affect current scope — the target Solidity is never deployed to Hedera; Hedera carries x402 payments and HCS receipts only, and the pinned Foundry EVM is the sole authority over gas and equivalence. It becomes binding in two roadmap cases: the challenge contract (R7), and the optional "deploy before/after to testnet" demo touch. **In those cases compile that artifact with `cancun`** and declare it.
 
-💡 **Bonus found in solady**: `fullMulDivUnchecked` (line 521) ships alongside `fullMulDiv`. The same library carries the checked and unchecked versions, so **the price of dropped semantics is measurable between two of their own functions** — and `restored_f` becomes a small delta over `fullMulDiv` (align the error behaviour to OZ's) instead of a rewrite.
+💡 **Bonus found in solady**: `fullMulDivUnchecked` ships alongside `fullMulDiv`, so the price of dropped semantics is measurable between two of their own functions.
+
+⚠️ **Weakened twice since.** `restored_f` no longer exists (D-04), and the `mulDiv` arithmetic is **`UNKNOWN`** — bitwuzla exhausts memory both unconditionally and on the guarded non-revert domain ([Addendum 5](spike/DAY1-RESULTS.md)). A gas delta between two implementations not shown to compute the same thing is **not a price**. If published at all it goes out labelled `UNKNOWN`, beside the counterexample.
 
 ### Hedera / Blocky402 — no access request needed
 
@@ -97,8 +99,8 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
     "function":      "OZ/Math.log2",
     "variant_hash":  "keccak256 of the mutated variant source",
     "baseline_hash": "keccak256 of the baseline source",
-    "scenario_id":   "logs/v1",
-    "scenario_hash": "keccak256 of the fixture set",
+    "scenario_id":   "0xd8fd95feb303bffc21724cbcca5ffad44286df2c602461e73026abc243e81f00",
+    "scenario_name": "boundary/v1",
     "prompt_hash":   "keccak256 of the fixed system prompt"
   },
 
@@ -119,12 +121,19 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
     "settle_tx":     ""
   },
 
-  "gas": { "v1": 0, "baseline": 0, "patch": 0, "relative_progress": 0.0 },
+  "gas": {
+    "inputs": 769, "scored": 0, "skipped": 0,
+    "v1_total": 0, "baseline_total": 0, "patch_total": 0,
+    "patch_max_regression": 0, "patch_regressed_inputs": 0,
+    "relative_progress": 0.0
+  },
 
   "guarantee": {
     "label":  "FORMAL_NO_EXPLICIT_INPUT_BOUND | FORMAL_BOUNDED | FUZZED | UNKNOWN",
     "bounds": { "max_iterations": null, "max_input_len": null },
-    "reverts_covered": true
+    "assumptions": [],
+    "reverts_covered": true,
+    "mutation_refuted": true
   },
 
   "toolchain": {
@@ -143,7 +152,11 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
 
 | Field | Without it |
 |---|---|
-| `scenario_id` / `scenario_hash` | Gas for a pure function depends on its inputs. A score quoted without its fixture set is **undefined**, and invites cherry-picking |
+| `scenario_id` | ⚠️ It is the **`keccak256` of the input vector**, not a name. `"boundary/v1"` would stay identical while the vector underneath it changed, letting two runs claim the same scenario after being scored on different inputs. The name is carried separately and binds nothing. Gas for a pure function depends on its inputs: a score quoted without its fixture set is **undefined** |
+| `patch_max_regression` / `patch_regressed_inputs` | The scoring rule (WHETSTONE §1) ranks on the total and **requires** the worst single-input regression beside it. A patch can win on the total while making one boundary input much worse. **No leaderboard row exists with only one of the two** |
+| `scored` / `skipped` | A patch that reverts on part of the domain would otherwise silently shrink the denominator and look efficient |
+| `guarantee.assumptions` | A **conditional** proof whose condition is not published is not a result. Where the wrapper restricts the domain — `d != 0`, "the 512-bit product fits" — the restriction is part of the claim |
+| `guarantee.mutation_refuted` | R4 requires `M` to be semantic. This records that hevm **refuted** `OZ_M ≡ OZ_f`. If it is false, a memorized answer is still correct and the anti-contamination defence is decoration |
 | `prompt_hash`, `max_rounds`, `temperature` | The agent interface is the independent variable; runs are not comparable |
 | `round` | A patch found on round 1 and one found on round 8 cost different amounts |
 | `status` | The leaderboard would fake a finality it does not have |
@@ -206,25 +219,39 @@ overflows, the boundary at `2**128`. Random draws almost never land on them.
 
 ## Pivot gates
 
+**Status after day 1**: Gate 1 **passed** on `log256`/`log2` (seconds, complete
+exploration) and **fired** on `mulDiv` and `toHexString` — which is why the plan
+carries two targets with two different labels. Gate 2 **passed**, and is now
+re-asserted on every run by `scripts/selfcheck.sh` (R12) rather than remembered.
+Gate 4 cannot be evaluated until `M` exists.
+
 ```
 GATE 1 — hevm/halmos does not terminate on the day-1 target
+  STATUS: passed on log256/log2; FIRED on mulDiv (UNKNOWN, solver OOM)
+          and on toHexString (partial exploration)
   PIVOT: drop the relative-to-baseline percentage.
          Show absolute gas delta + FUZZED label.
          The thesis becomes "declared guarantee", not "proven equivalence".
 
 GATE 2 — the checker does not cover revert payloads (negative test failed)
+  STATUS: passed. hevm DOES compare revert payloads -- 0.1s, ErrA vs ErrB.
+          Undocumented behaviour, so it is re-checked on EVERY run (R12),
+          paired with a positive control, and hevm 0.58.0 is pinned in the
+          receipt. This gate can still fire on a toolchain change.
   PIVOT: formal on success/output/storage only.
          Revert bytes covered at gate 2, stated on every row.
-         The restored-solady story weakens: say so, do not work around it.
 
 GATE 3 — the paid x402 round-trip does not settle on Sunday
   (Blocky402 testnet is open access; the real dependency is a funded Hedera account)
   PIVOT: use the Hedera x402 pay-per-request PoC as-is.
          DO NOT build a multi-provider gateway.
 
-GATE 4 — gas(restored_M) >= gas(variant)
+GATE 4 — gas(solady_M) >= gas(OZ_M)   [the mutation damaged the baseline]
+  STATUS: not evaluable until M exists.
   PIVOT: that function goes to the "denominator not established" bucket.
-         Change function; do not adjust the denominator.
+         Redesign M, or change function. Do NOT adjust the denominator:
+         an inflated denominator is exactly the circularity the bilateral
+         construction exists to prevent.
 ```
 
 ---
@@ -275,7 +302,7 @@ NEVER cut:
 - [ ] Public repo with **real commit history** (large single commits risk disqualification)
 - [ ] Partner prizes selected: **Hedera · The Graph · Uniswap** (3 max; multi-track partners count as 1)
 - [ ] Registered in the **Start Fresh** pool
-- [ ] `AI_USAGE.md`: which files were AI-assisted, which are hand-written. **Solo builder** — the hand-written `restored_f` / `restored_M_f` are the human contribution rule 2 asks to see
+- [ ] `AI_USAGE.md`: which files were AI-assisted, which are hand-written. **Solo builder** — the human contribution R2 asks to see is now the **mutation `M`**, applied by hand to both sides, plus the scenario, harness and allocator policy. ⚠️ Authorship of `M` is a declared fact: if it was model-assisted, say so
 - [ ] `/spec` directory with spec files, prompts and planning artifacts (required for spec-driven workflows)
 - [ ] README: prior art and declared scope at the top
 - [ ] `FEEDBACK.md` + Uniswap feedback form — **only if the Uniswap deliverable actually happened**

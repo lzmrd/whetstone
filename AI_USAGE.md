@@ -53,8 +53,8 @@ What remains as human work, stated plainly:
 | Artifact | Why it is load-bearing |
 |---|---|
 | **The bilateral semantic mutation** — `M` applied by hand to *both* OZ and solady, with `hevm(solady_M ≡ OZ_M)` proven | This is now the baseline. A hand-written baseline could be made deliberately slow to inflate the denominator, so both mutants are published side by side and the equivalence is machine-checked |
-| **The exhaustive fixture set** (`Scenario.inputs()`, 769 boundary inputs) | Not decoration: the sparse ten-input set overstated the gap by ~2×. The scenario is what makes a score defined |
-| **The harness**, gates, guarantee labelling, receipt construction | |
+| **The exhaustive fixture set** (`Scenario.inputs()`, 769 boundary inputs, identified by content digest) | The scenario is what makes a score defined at all. ⚠️ It was previously justified here by the claim that the sparse ten-input set overstated the gap by ~2×; that claim is **withdrawn** — the effect was gas-instrument bias, not fixture overfitting (D-14). The design argument stands; its supporting measurement does not |
+| **The harness**, gates, guarantee labelling, receipt construction | Including the controls that caught three faulty gas instruments and two tests that reported the opposite of what they measured |
 | **The allocator policy** — explicit, deterministic, printed on screen next to its decision | |
 
 **Is this weaker than "I hand-wrote researcher-grade assembly"? Yes.** It is
@@ -70,9 +70,20 @@ Kept current as code lands. `H` = hand-written, `A` = AI-generated, `HA` = AI-as
 
 | Path | Attribution | Notes |
 |---|---|---|
-| `spec/*.md` | HA | AI-drafted, human-directed and repeatedly redirected |
-| `contracts/src/restored_*.sol` | **H** | Must stay hand-written — see above |
-| _(to be extended)_ | | |
+| `spec/*.md`, `README.md` | HA | AI-drafted, human-directed and repeatedly redirected — including several rewrites forced by structured critique |
+| `contracts/src/spike/*.sol` | HA | Equivalence probes and wrappers |
+| `contracts/test/Scenario.sol` | HA | Fixture vector and its content digest |
+| `contracts/test/GasMeter.sol`, `OrderControl.t.sol`, `HarnessSelfCheck.t.sol` | HA | The instrument and its controls |
+| `scripts/equiv.sh`, `scripts/selfcheck.sh` | HA | Equivalence runner and the per-run gate check |
+| `harness/src/*.mjs` | HA | Payment and model-access smoke tests |
+| `harness/src/prices.json` | **H** | Prices transcribed by hand from the published page; source URL, date and sha256 recorded in the file |
+| **the mutation `M`** | ⚠️ **not yet written** | R2: authorship is a declared fact. This row must be filled before submission, and must be accurate |
+
+⚠️ **Stated plainly, because the table above is easy to skim past: every artifact
+in this repository so far was written by the model under human direction.** The
+human contribution to date is directional — the constraints, the rejections, the
+critiques that forced rewrites — plus the pinned price table. The one artifact
+designated as human work, the mutation `M`, **does not exist yet**.
 
 ---
 
