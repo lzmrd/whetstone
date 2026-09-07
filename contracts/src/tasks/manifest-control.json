@@ -1,0 +1,28 @@
+{
+  "_comment": "CONTROL variant. Cosmetically rewritten, behaviourally identical. Exists to falsify our reading of the semantic result, not to score models.",
+  "id": "log256-cosmetic-control/v1",
+  "kind": "control",
+  "task": {
+    "path": "contracts/src/tasks/ControlTask.sol",
+    "contract": "ControlCandidate",
+    "sig": "f(uint256)"
+  },
+  "baseline": {
+    "path": "contracts/src/tasks/ControlBaseline.sol",
+    "contract": "ControlBaseline"
+  },
+  "original": {
+    "path": "contracts/src/tasks/Original.sol",
+    "contract": "Original"
+  },
+  "mutation": {
+    "description": "COSMETIC ONLY: renamed variables, an extracted helper, `* 128` for `<< 7`, `/ 8` for `>> 3`, a ternary for the branchless cast. No behavioural change.",
+    "author": "Claude (Claude Code)",
+    "applied_to": [
+      "task"
+    ],
+    "proof_1_baseline_equals_task": "must PASS",
+    "proof_2_task_differs_from_original": "must PASS  <- INVERTED: a control that changed behaviour is not a control"
+  },
+  "_never": "Must not share a leaderboard column with a semantic task. A memorised answer is still correct here."
+}

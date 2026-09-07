@@ -615,7 +615,9 @@ Final video edit · README with prior art and scope at the top · `AI_USAGE.md` 
 
 ### Dropped from the plan by the calendar cut
 
-Ratchet · procedural mutation engine · control family · cross-family dispersion. All roadmap. The hand-written mutation `M` stays: without it there is no anti-memorization defence, and its required refutation (§4) is the only machine-checked part of that defence.
+Ratchet · procedural mutation engine · cross-family dispersion. All roadmap.
+
+⚠️ **The control family was on this list and one member of it was built after all**, because the schedule allowed it: a cosmetic variant of the same function, which turns *"the mutation probably defeated memorisation"* into a measurement — 99.9% of baseline on the cosmetic control against 13.9% on the semantic mutation, same model and interface ([Addendum 8](spike/DAY1-RESULTS.md)). It is one control, not the family. The hand-written mutation `M` stays: without it there is no anti-memorization defence, and its required refutation (§4) is the only machine-checked part of that defence.
 
 ---
 

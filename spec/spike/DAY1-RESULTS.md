@@ -510,3 +510,73 @@ measurement in the project that speaks to the question it was built to answer.
 The control that would settle it — the same model on a *cosmetically* mutated
 variant, where a memorised answer stays correct — is the control family already
 listed as cut from this hackathon's scope.
+
+---
+
+# Addendum 8 — the control, and what it settles
+
+Addendum 7 reported that the semantic mutation cost `gpt-oss-120b` most of its
+performance, and said plainly that two explanations fitted equally well:
+
+- **(a)** the mutation removed the memorised answer
+- **(b)** the mutated function is simply harder
+
+and that the control which separates them had been cut for time. It was built,
+because the schedule allowed it. It changes the reading.
+
+## The control
+
+`log256-cosmetic-control/v1` shares no line with the original — renamed
+variables, an extracted helper, `* 128` for `<< 7`, `/ 8` for `>> 3`, a ternary
+for the branchless cast — and computes **exactly the same function**. Both proof
+obligations discharged, with proof 2 **inverted** for this kind of variant:
+
+```
+proof 1   hevm(ControlBaseline ≡ ControlCandidate)   PASS   (denominator computes the task)
+proof 2   hevm(ControlCandidate ≡ Original)          PASS   (INVERTED: a control that
+                                                             changed behaviour is not a control)
+```
+
+So here **a memorised answer is still correct**, while the source looks nothing
+like what the model was trained on.
+
+## The result
+
+`groq/openai/gpt-oss-120b`, n=5, temperature 0.2, identical interface, identical
+instrument:
+
+| | **control** (cosmetic) | **`log256-bytelen/v1`** (semantic) |
+|---|---|---|
+| produced a patch | **5/5** | 4/5 |
+| gas/call | 799, 799, 799, 799, 780 | −71, 40, 40, 236 |
+| range | **780 – 799** | **−71 – 236** |
+| max regression, worst | **0** | **331** |
+| **vs baseline, median** | **99.9%** | **13.9%** |
+
+## What it settles
+
+**Explanation (b) does not survive.** When the function is cosmetically
+unrecognisable but semantically familiar, the model reaches **99.9% of the
+efficient reference implementation, five times out of five, with a spread of 19
+gas across seeds**. Its ability to find the optimum is intact; source-level
+disguise does not touch it.
+
+Change the semantics and the same model, same interface, same day, closes **13.9%**
+with a spread that crosses zero.
+
+⚠️ **99.9% means it essentially reproduced the reference implementation.** That is
+itself the finding: on a familiar function the model does not search, it recalls.
+
+## What it does not settle
+
+⚠️ The mutated function could still be intrinsically harder for reasons unrelated
+to memory — the control shows recall is available and sufficient on the familiar
+variant, not that nothing else changed. Establishing that would need several
+mutations of differing kinds, which is the mutation family still out of scope.
+
+⚠️ One model, one function, n=5. This is a demonstration that the method detects
+the effect, not a measurement of how large the effect is in general.
+
+⚠️ The control **must never share a leaderboard column with a semantic task**. Its
+receipts carry `mutation_refuted: false`, and 799 gas/call against 40 is not a
+comparison, it is two different questions.

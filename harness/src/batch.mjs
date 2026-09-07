@@ -40,7 +40,13 @@ const target = resolve(spec);
 const manifest = loadManifest();
 process.stdout.write(`preparing task ${manifest.id} — running both proofs … `);
 const prepared = await prepareTask(manifest);
-console.log(`proof 1 ${prepared.proof_1}, proof 2 REFUTED ✓`);
+// ⚠️ Print the OUTCOME, not a fixed string. This line said "proof 2 REFUTED ✓"
+// unconditionally and printed it for a control whose proof 2 had PASSED --
+// the log asserting the opposite of what was measured.
+console.log(
+  `kind=${prepared.kind}  proof 1 ${prepared.proof_1}  proof 2 ${prepared.proof_2}` +
+    ` (${prepared.kind === 'semantic' ? 'refutation required' : 'equivalence required'}) ✓`,
+);
 const taskSource = prepared.taskSource;
 
 console.log(`
@@ -65,14 +71,15 @@ for (let seed = 1; seed <= n; seed++) {
       seed,
     });
   } catch (e) {
-    console.log(`✗ ${e.message.slice(0, 80)}`);
+    console.log(`✗ ${e.message.slice(0, 160)}`);
     results.push({ seed, ok: false, reason: e.message });
     continue;
   }
 
   const g = run.gas;
   if (!run.patch) {
-    console.log(`✗ ${run.stop_reason} after ${run.rounds.length} round(s)`);
+    const last = run.rounds[run.rounds.length - 1];
+    console.log(`✗ ${run.stop_reason} after ${run.rounds.length} round(s)  ${(last?.detail ?? '').slice(0, 150)}`);
     results.push({ seed, ok: false, reason: run.stop_reason, rounds: run.rounds.length, usd: run.usd });
     continue;
   }
