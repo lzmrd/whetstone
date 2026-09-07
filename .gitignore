@@ -25,3 +25,7 @@ harness/.runs/
 
 # os
 .DS_Store
+
+# spike tooling (large binaries, reproducible from .envrc.sh instructions)
+.tools/
+.venv-tools/

@@ -1,0 +1,23 @@
+{
+  "_comment": "Pinned price table. The OpenCode Zen /v1/models endpoint returns no pricing (only id, object, created, owned_by), so runtime fetching is not possible and prices are pinned here instead. Every receipt records this file's version and hash, so anyone can check these figures against the source URL below.",
+  "_source": "https://opencode.ai/docs/zen/",
+  "_retrieved": "2026-09-06",
+  "_unit": "USD per 1M tokens",
+  "_version": 1,
+
+  "prices": {
+    "minimax-m3":                      { "input": 0.30, "output": 1.20, "cached_read": 0.06 },
+    "minimax-m2.7":                    { "input": 0.30, "output": 1.20, "cached_read": 0.06 },
+    "minimax-m2.5":                    { "input": 0.30, "output": 1.20, "cached_read": 0.06 },
+
+    "big-pickle":                      { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
+    "mimo-v2.5-free":                  { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
+    "ling-3.0-flash-fin-free":         { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
+    "nemotron-3-ultra-free":           { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
+    "nemotron-3.5-lightning-free":     { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
+    "muse-spark-1.3-contributor-free": { "input": 0.0, "output": 0.0, "cached_read": 0.0 },
+    "deepseek-v4-flash-free":          { "input": 0.0, "output": 0.0, "cached_read": 0.0 }
+  },
+
+  "_todo": "Add the paid models actually used in the measured batch, transcribed from the source URL on the date recorded above. A model with no entry here cannot be metered and must not appear in the leaderboard."
+}
