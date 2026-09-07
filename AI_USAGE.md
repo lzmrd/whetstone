@@ -97,13 +97,42 @@ Kept current as code lands. `H` = hand-written, `A` = AI-generated, `HA` = AI-as
 | `scripts/equiv.sh`, `scripts/selfcheck.sh` | HA | Equivalence runner and the per-run gate check |
 | `harness/src/*.mjs` | HA | Payment and model-access smoke tests |
 | `harness/src/prices.json` | **H** | Prices transcribed by hand from the published page; source URL, date and sha256 recorded in the file |
-| **the mutation `M`** | ⚠️ **not yet written** | R2: authorship is a declared fact. This row must be filled before submission, and must be accurate |
+| **the mutation `M`** (`contracts/src/tasks/Task.sol`, `Baseline.sol`) | ⚠️ **A** — model-written | Written by Claude on 7 September at the builder's explicit instruction. See below |
 
-⚠️ **Stated plainly, because the table above is easy to skim past: every artifact
-in this repository so far was written by the model under human direction.** The
-human contribution to date is directional — the constraints, the rejections, the
-critiques that forced rewrites — plus the pinned price table. The one artifact
-designated as human work, the mutation `M`, **does not exist yet**.
+### ⚠️ The mutation is model-written, and that weakens a claim this project made
+
+`M` — *the result is the number of bytes needed to represent `x` rather than the
+index of its highest non-zero byte, and zero reverts instead of returning a
+value* — was written by Claude, not by the builder. The builder was offered the
+choice, understood the trade-off, and chose this.
+
+**Why it matters enough to have its own section.** R2 named `M` as the human
+artifact of Track S, and the argument for it was not paperwork: `M` is the
+decision about *what makes a task hard*. If the model chooses that, the
+benchmark's difficulty is defined by the thing being benchmarked.
+
+**What survives.** The anti-circularity defence never rested on authorship. It
+rests on the bilateral construction, which is machine-checked and third-party
+verifiable regardless of who typed it:
+
+- the efficient code is still Vectorized's; only `M` is ours
+- `hevm(Baseline ≡ Candidate)` is **proved**, so the denominator computes the task
+- `hevm(Candidate ≡ Original)` is **refuted**, so the mutation is demonstrably
+  semantic and not cosmetic — R4 verified rather than asserted
+- both mutants are published side by side, so nobody has to take our word that
+  the baseline was not shaped to flatter or punish a model
+- `gas(Baseline) < gas(Candidate)` holds on every one of the 768 scored inputs,
+  so `M` did not damage the third-party efficiency anchor
+
+**What does not survive.** Nothing in this repository is now a substantial
+hand-written human artifact. The honest description of the human contribution is
+**direction, constraint and rejection** — the questions that changed the
+architecture (recorded in [spec/DECISIONS.md](spec/DECISIONS.md)), the refusal of
+weak claims, the commissioning of four adversarial reviews — plus the pinned
+price table. That is a real contribution to a spec-driven project and it is not
+the same thing as writing the load-bearing artifact.
+
+Recorded here rather than left for a judge to work out.
 
 ---
 

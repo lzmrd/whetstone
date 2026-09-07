@@ -149,9 +149,11 @@ export async function runAgent({
   model,
   provider,
   gateway = process.env.GATEWAY_URL || null,
-  taskPath,
-  contractName = 'Candidate',
-  sig = 'f(uint256)',
+  // A task prepared and PROVED by task.mjs. Passing a bare path is no longer
+  // allowed: a run whose two proofs were never checked is not a benchmark run.
+  prepared,
+  contractName = prepared?.manifest.task.contract ?? 'Candidate',
+  sig = prepared?.manifest.task.sig ?? 'f(uint256)',
   price = { input: 0, output: 0 },
   maxRounds = INTERFACE.max_rounds,
   budgetUsd = INTERFACE.budget_usd_per_run,
@@ -162,32 +164,13 @@ export async function runAgent({
   apiKey = process.env.OPENCODE_API_KEY,
   log = () => {},
 }) {
-  const rawTask = await readFile(taskPath, 'utf8');
-  const taskSource = stripComments(rawTask);
-
-  // §5 gate. Throws rather than warns: a run that leaks the upstream identity
-  // still produces a number, and that number is meaningless.
-  //
-  // Checked on the STRIPPED text, because that is what is sent -- but the strip
-  // is then proved to have changed nothing that matters, below.
-  assertClean(taskSource, `task file ${taskPath} (after comment stripping)`);
+  if (!prepared) throw new Error('runAgent needs a task prepared by prepareTask(): both proofs must be checked first');
+  const { taskSource, task: taskBuild, baseline } = prepared;
   assertClean(SYSTEM_PROMPT, 'system prompt');
 
-  const rawBuild = await compileToRuntime(rawTask, contractName);
-  if (!rawBuild.ok) throw new Error(`the task itself does not compile:\n${rawBuild.errors}`);
-
-  const taskBuild = await compileToRuntime(taskSource, contractName);
-  if (!taskBuild.ok) throw new Error(`the task does not compile after comment stripping:\n${taskBuild.errors}`);
-
-  // ⚠️ The stripper is a regex and Solidity string literals can contain "//".
-  // If it removed anything that reaches the bytecode, the model is being scored
-  // on a different function than the one the repository holds. Refuse the run.
-  if (rawBuild.runtime !== taskBuild.runtime) {
-    throw new Error(
-      'comment stripping changed the compiled bytecode -- the stripper corrupted the source. ' +
-        'The model would be scored on a different function than the one in the repository.',
-    );
-  }
+  // The denominator, measured once per run against the same instrument the
+  // patch will be measured with.
+  const baselineGas = await measurePatch(taskBuild.path, baseline.path);
 
   const messages = [
     { role: 'system', content: SYSTEM_PROMPT },
@@ -205,6 +188,10 @@ export async function runAgent({
     prompt_hash: PROMPT_HASH,
     temperature,
     seed,
+    task_id: prepared.manifest.id,
+    mutation_refuted: prepared.mutation_refuted,
+    baseline_total: baselineGas.patch_total,
+    proof_1: prepared.proof_1,
     toolchain: { ...PINS },
     rounds: [],
     tokens_in: 0,
@@ -280,7 +267,12 @@ export async function runAgent({
         if (eq.equivalent === true) {
           log(round, 'proved', eq.label);
           const gas = await measurePatch(taskBuild.path, built.path);
-          log(round, 'gas', `${gas.saved_per_call} gas/call saved, max regression ${gas.patch_max_regression}`);
+          // ⚠️ Above 100% is expected and legitimate: the patch beat the
+          // baseline, it did not violate a limit. The baseline is not a ceiling.
+          const denom = gas.v1_total - baselineGas.patch_total;
+          gas.baseline_total = baselineGas.patch_total;
+          gas.relative_progress = denom > 0 ? Number((gas.saved_total / denom).toFixed(4)) : null;
+          log(round, 'gas', `${gas.saved_per_call} gas/call saved, max regression ${gas.patch_max_regression}, ${(gas.relative_progress * 100).toFixed(1)}% of baseline`);
           run.rounds.push({ round, outcome: 'proved', label: eq.label, gas });
           run.patch = { source: got.source, runtime: built.runtime, path: built.path, label: eq.label };
           run.gas = gas;

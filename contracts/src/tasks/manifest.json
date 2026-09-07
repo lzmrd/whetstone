@@ -1,0 +1,15 @@
+{
+  "_comment": "One task. The harness reads this rather than guessing filenames, so what was measured is stated rather than inferred.",
+  "id": "log256-bytelen/v1",
+  "task": { "path": "contracts/src/tasks/Task.sol", "contract": "Candidate", "sig": "f(uint256)" },
+  "baseline": { "path": "contracts/src/tasks/Baseline.sol", "contract": "Baseline" },
+  "original": { "path": "contracts/src/tasks/Original.sol", "contract": "Original" },
+  "mutation": {
+    "description": "result is the NUMBER OF BYTES needed to represent x rather than the index of its highest non-zero byte, and zero reverts with ZeroHasNoBytes() instead of returning a value",
+    "author": "Claude (Claude Code)",
+    "_author_note": "⚠️ Model-written. R2 asks that authorship be a declared fact, not an assumption. Disclosed in AI_USAGE.md.",
+    "applied_to": ["task", "baseline"],
+    "proof_1_baseline_equals_task": "must PASS",
+    "proof_2_task_differs_from_original": "must REFUTE"
+  }
+}

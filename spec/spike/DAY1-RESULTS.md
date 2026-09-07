@@ -462,3 +462,51 @@ that needs both columns:
 the **unmutated placeholder**, so a memorised answer is still a correct answer and
 these are pipeline measurements, not benchmark results. They must never be quoted
 as a comparison of model capability.
+
+
+---
+
+# Addendum 7 — the mutation lands, and the task gets harder
+
+`M` applied by hand to both sides, and both proof obligations discharged by hevm:
+
+```
+proof 1   hevm(Baseline ≡ Candidate)   PASS, FORMAL_NO_EXPLICIT_INPUT_BOUND
+proof 2   hevm(Candidate ≡ Original)   REFUTED
+precondition  gas(Baseline) 398 592  <  gas(Candidate) 616 320   (283/call, 0 regressions)
+```
+
+⚠️ Both are now run by `prepareTask()` on **every batch**, and a task failing
+either cannot be scored. `mutation_refuted` stopped being a boolean somebody set
+in a JSON file and became a property that is checked.
+
+`skipped 1` in every measurement is the mutation showing up in the instrument:
+zero now reverts on both sides, so 768 of 769 inputs are scored.
+
+## Same model, same interface, before and after the mutation
+
+`groq/openai/gpt-oss-120b`, n=5, temperature 0.2:
+
+| | placeholder (unmutated) | **`log256-bytelen/v1` (mutated)** |
+|---|---|---|
+| produced a patch | 5/5 | 4/5 |
+| gas/call, median | 151 | **40** |
+| range | 142 – 263 | **−71 – 236** |
+| max regression, worst | **0** | **331** |
+| vs baseline | — (no baseline existed) | **13.9%** |
+
+⚠️ **These are different functions, so the absolute numbers are not directly
+comparable.** What is comparable is the *character* of the results: a tight
+cluster with no regressions became a spread crossing zero with regressions on
+three of four seeds. On the unmutated task the model reached for `clz` and
+landed cleanly every time; with the semantics changed it produces inconsistent
+patches, all still proved equivalent, several of them worse than what they
+replaced.
+
+That is the anti-memorisation defence doing visible work, and it is the first
+measurement in the project that speaks to the question it was built to answer.
+
+⚠️ It is **not** proof that memorisation was the cause. One task, one model, n=5.
+The control that would settle it — the same model on a *cosmetically* mutated
+variant, where a memorised answer stays correct — is the control family already
+listed as cut from this hackathon's scope.

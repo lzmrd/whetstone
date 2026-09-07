@@ -29,9 +29,10 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
     status: 'provisional',
 
     task: {
+      id: run.task_id,
       function: taskPath,
       variant_hash: sha256(taskSource),
-      baseline_hash: null,
+      baseline_hash: run.baseline_hash ?? null,
       scenario_id: run.gas?.scenario_id ?? null,
       scenario_name: 'boundary/v1',
       prompt_hash: run.prompt_hash,
@@ -75,8 +76,8 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
           // ⚠️ null, not 0. Relative progress needs a baseline, the baseline is
           // solady under the mutation M, and M does not exist yet. Reporting a
           // number here would invent a denominator.
-          baseline_total: null,
-          relative_progress: null,
+          baseline_total: run.gas.baseline_total ?? null,
+          relative_progress: run.gas.relative_progress ?? null,
         }
       : null,
 
@@ -86,10 +87,10 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
           bounds: { max_iterations: -1, max_input_len: null },
           assumptions: [],
           reverts_covered: true,
-          // ⚠️ false because the task is the PLACEHOLDER: no mutation has been
-          // applied, so nothing was refuted. A run with this false is not a
-          // valid benchmark run, and saying so in the record is the point.
-          mutation_refuted: false,
+          // Verified per run by task.mjs, not asserted: hevm must REFUTE
+          // task == original, or prepareTask throws and nothing is scored.
+          mutation_refuted: run.mutation_refuted === true,
+          proof_1_baseline_equals_task: run.proof_1 ?? null,
         }
       : null,
 

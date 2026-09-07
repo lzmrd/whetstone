@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs';
 import { runAgent, INTERFACE } from './agent.mjs';
 import { resolve } from './providers.mjs';
 import { buildReceipt, publishReceipt } from './receipt.mjs';
+import { loadManifest, prepareTask } from './task.mjs';
 
 const [, , spec, nRaw = '5', taskPath = '../contracts/src/tasks/Task.sol'] = process.argv;
 if (!spec) {
@@ -36,11 +37,16 @@ const quantile = (xs, q) => {
 };
 
 const target = resolve(spec);
-const taskSource = readFileSync(taskPath, 'utf8');
+const manifest = loadManifest();
+process.stdout.write(`preparing task ${manifest.id} — running both proofs … `);
+const prepared = await prepareTask(manifest);
+console.log(`proof 1 ${prepared.proof_1}, proof 2 REFUTED ✓`);
+const taskSource = prepared.taskSource;
 
 console.log(`
 model        ${spec}
-task         ${taskPath}
+task         ${manifest.id}   (${manifest.task.path})
+mutation     ${manifest.mutation.description}
 seeds        ${n}   temperature ${INTERFACE.temperature}   max_rounds ${INTERFACE.max_rounds}
 `);
 
@@ -55,7 +61,7 @@ for (let seed = 1; seed <= n; seed++) {
       baseUrl: target.baseUrl,
       apiKey: target.apiKey,
       price: target.price,
-      taskPath,
+      prepared,
       seed,
     });
   } catch (e) {
@@ -91,6 +97,7 @@ if (ok.length === 0) {
 }
 
 const saved = ok.map((r) => r.saved_per_call);
+const rel = ok.map((r) => r.relative_progress).filter((x) => x != null);
 const regs = ok.map((r) => r.patch_max_regression);
 const costs = ok.map((r) => r.usd);
 
@@ -99,6 +106,7 @@ console.log(`  runs             ${ok.length}/${n} produced a patch`);
 console.log(`  gas/call         median ${median(saved)}   min ${Math.min(...saved)}   max ${Math.max(...saved)}   p25 ${quantile(saved, 0.25)}  p75 ${quantile(saved, 0.75)}`);
 console.log(`  max regression   median ${median(regs)}   worst ${Math.max(...regs)}          <- mandatory column`);
 console.log(`  cost             median $${median(costs).toFixed(6)}   total $${costs.reduce((a, b) => a + b, 0).toFixed(6)}`);
+if (rel.length) console.log(`  vs baseline      median ${(median(rel) * 100).toFixed(1)}%   (>100% = beat the baseline, expected and legitimate)`);
 console.log(`  labels           ${[...new Set(ok.map((r) => r.label))].join(', ')}`);
 
 // ⚠️ A spread that straddles zero is not "the model saves ~X gas".
