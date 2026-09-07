@@ -26,7 +26,9 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
     run_id: `${Date.now().toString(36)}-${sha256(spec + taskSource).slice(0, 8)}`,
     round: run.rounds.length,
     // ⚠️ Never "final" while the baseline does not exist. See gas.relative_progress.
-    status: 'provisional',
+    // "unpaid" is stronger than provisional: the run bypassed the x402 gateway and
+    // must not appear in a leaderboard at all.
+    status: run.paid === false ? 'unpaid — NOT SCOREABLE' : 'provisional',
 
     task: {
       id: run.task_id,
@@ -61,6 +63,7 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
       hbar_paid: (payments.reduce((n, p) => n + Number(p.amount_tinybar), 0) / 1e8).toFixed(8),
       settlements: payments.map((p) => ({ tx: p.transaction, amount_tinybar: p.amount_tinybar, pay_to: p.pay_to })),
       settle_tx: payments[0]?.transaction ?? payment?.transaction_id ?? null,
+      paid_through_gateway: run.paid === true,
     },
 
     gas: run.gas

@@ -166,6 +166,24 @@ export async function runAgent({
   log = () => {},
 }) {
   if (!prepared) throw new Error('runAgent needs a task prepared by prepareTask(): both proofs must be checked first');
+
+  /**
+   * ⚠️ "There is no unpaid path to the models" was written in a commit message
+   * and was FALSE: with GATEWAY_URL unset the harness called the provider
+   * directly with its own key. The gateway gated third parties, not us.
+   *
+   * Now it is true where it matters. A run without the gateway is refused unless
+   * WHETSTONE_UNPAID is set explicitly, and a run made that way is marked
+   * unpaid, which disqualifies it from being scored or published.
+   */
+  const unpaidAllowed = process.env.WHETSTONE_UNPAID === '1';
+  if (!gateway && !unpaidAllowed) {
+    throw new Error(
+      'GATEWAY_URL is not set, so this run would reach the provider without paying.\n' +
+        'Start the gateway (npm run gateway) or set WHETSTONE_UNPAID=1 to run unpaid — ' +
+        'in which case the run is marked unpaid and MUST NOT be scored or published.',
+    );
+  }
   const { taskSource, task: taskBuild, baseline, trivial } = prepared;
   assertClean(SYSTEM_PROMPT, 'system prompt');
 
@@ -203,6 +221,7 @@ export async function runAgent({
     tokens_in: 0,
     tokens_out: 0,
     payments: [],
+    paid: Boolean(gateway),
     usd: 0,
     metered: true,
     patch: null,

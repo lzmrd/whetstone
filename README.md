@@ -140,7 +140,9 @@ Every model call is paid for on-chain, per call, before the response is used.
      to our gateway, which then proxies the inference call
 ```
 
-**Pricing is pass-through.** The amount is computed as `tokens × published list price` and written into the receipt. The subscription used to fund the calls is not what is reported: the reported cost is the list-price equivalent, so the number means "what this would cost anyone", not "what we happened to pay".
+**Two different numbers, never conflated.** `hbar_paid` is what actually moved on Hedera: the gateway meters each request as `base + estimated input tokens + declared max_tokens`, so the charge varies per call, and the 402 response carries the breakdown. ⚠️ Because x402 settles *before* the work, output is priced at the ceiling the client asked for — an upper bound that overcharges against tokens actually used.
+
+`usd_list` is the reported cost: `tokens actually used × published list price`, written into the receipt. The subscription used to fund the calls is not what is reported: the reported cost is the list-price equivalent, so the number means "what this would cost anyone", not "what we happened to pay".
 
 ⚠️ **The list price is pinned by hand, not fetched.** The provider's `/v1/models` endpoint returns only `id`, `object`, `created`, `owned_by` — **no pricing**. Prices live in `harness/src/prices.json` with source URL, retrieval date, version and sha256, and that hash goes into the receipt. A model with no price entry cannot be metered and does not appear in the leaderboard.
 

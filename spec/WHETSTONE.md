@@ -537,6 +537,8 @@ Up to **3 partner prizes** may be selected; a partner with multiple tracks count
 - [ ] README: closed-loop answer (provider usage report alongside receipts; gateway open to third parties)
 
 **Extra points scored: 2 of 7** — per-call metering rather than a flat charge ✅, verifiable HCS audit trails ✅.
+
+⚠️ The metering claim was **false for most of Monday**: the gateway charged 0.001 HBAR per request regardless of size. It now quotes `base + input_tokens × rate + max_tokens × rate`, so the amount differs with every request (11 632 tinybar for `max_tokens=100`, 74 032 for 4 000) and the 402 body carries the breakdown so the charge is inspectable rather than asserted. ⚠️ x402 settles **before** the work, so output is priced at the declared ceiling: it is an upper bound and **overcharges** relative to tokens actually used. That is why `hbar_paid` and `usd_list` are separate fields.
 Cheapest to add if Thursday allows: **HCS-14 agent identity**, or an **HTS token in the settlement path** instead of plain HBAR.
 Not attempted: A2A/ACP negotiation, UCP discovery, Scheduled Transactions.
 

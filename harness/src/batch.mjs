@@ -42,6 +42,13 @@ const quantile = (xs, q) => {
 
 const target = resolve(spec);
 
+// ⚠️ A batch is by definition a measured run, so an unpaid one is meaningless.
+if (!process.env.GATEWAY_URL) {
+  console.error('\n✗ GATEWAY_URL is not set. A batch reaches the models through the x402 gateway or not at all.');
+  console.error('  Start it with: npm run gateway\n');
+  process.exit(1);
+}
+
 // R12 — before anything is measured.
 process.stdout.write('self-check … ');
 await requireSelfCheck();
