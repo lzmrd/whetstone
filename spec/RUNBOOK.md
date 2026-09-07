@@ -179,7 +179,7 @@ artifacts/<run_id>/
   baseline.sol        the baseline it is measured against
   patch.sol           what the model returned
   wrapper.sol         the exact wrapper compiled
-  scenario.json       the fixture set, with its id and hash
+  Scenario.sol        the fixture set (Solidity), identified by keccak256 of its input vector
   prompt.txt          the fixed system prompt
   result.txt          raw checker output, including any partial-exploration warning
 ```
@@ -213,7 +213,7 @@ implementations is hours of CPU per pair, incompatible with the calendar — and
 random sampling covers the cases that matter *badly*: a zero divisor, a product that
 overflows, the boundary at `2**128`. Random draws almost never land on them.
 
-> **Structured corpus, not volume.** The fixture set in `scenario.json` carries the
+> **Structured corpus, not volume.** The fixture set in `contracts/test/Scenario.sol` carries the
 > boundaries explicitly; fuzzing runs on top of it to catch what was not thought of.
 > 20k runs over a seeded corpus beats 1M uniform draws for this shape of function.
 
