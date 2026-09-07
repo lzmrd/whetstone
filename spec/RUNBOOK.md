@@ -226,6 +226,28 @@ re-asserted on every run by `scripts/selfcheck.sh` (R12) rather than remembered.
 Gate 4 cannot be evaluated until `M` exists.
 
 ```
+GATE 0 — no model is reachable through the API
+  STATUS: ⚠️ FIRED, 7 September. Every model in the pinned price table:
+          · all *-free models -> "OpenCode's free tier can only be used in
+            OpenCode". The free tier is client-only; the API refuses it, and
+            no amount of credit changes that.
+          · all paid models   -> "Insufficient balance".
+          Detected by `npm run access`, which exists because `npm run models`
+          lists the catalogue and says nothing about entitlement.
+  PIVOT: three options, in order of cost-in-TIME, which is the binding
+         constraint:
+         1. Fund the OpenCode workspace. No code changes. At $0.30/$1.20 per 1M
+            an 8-round run on a small file is cents; the whole batch fits well
+            inside BUDGET_USD_MAX.
+         2. Switch provider to one whose free tier is API-accessible. Costs a
+            new base URL, new price-table entries, and re-verifying that `usage`
+            comes back -- without it there is no cost column.
+         3. Frontier API keys directly. Works, but drops the open-weight
+            positioning, so it changes the submission's claim, not just its
+            plumbing.
+  ⚠️ Until this clears, NO measured run is possible and the Tuesday deliverable
+     cannot be completed. Everything else in the pipeline is built and green.
+
 GATE 1 — hevm/halmos does not terminate on the day-1 target
   STATUS: passed on log256/log2; FIRED on mulDiv (UNKNOWN, solver OOM)
           and on toHexString (partial exploration)

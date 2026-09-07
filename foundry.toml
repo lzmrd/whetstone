@@ -16,6 +16,10 @@ evm_version = 'osaka'      # ✅ day 1: hevm 0.58.0 consumed osaka-compiled byte
                            #    fall back to 'cancun' and DECLARE the divergence from OZ's config.
 optimizer = true
 optimizer_runs = 200
+# Must match the solc flags in harness/src/compile.mjs. Metadata carries an IPFS
+# hash of the SOURCE TEXT, so identical logic in differently-formatted files
+# compiles to different bytecode -- which would defeat third-party recomputation.
+bytecode_hash = 'none'
 
 # Differential fuzzing gate (level 2)
 [profile.default.fuzz]
