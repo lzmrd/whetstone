@@ -22,6 +22,29 @@ import { signPayment } from './pay.mjs';
 import { differential, fuzzCampaign } from './differential.mjs';
 
 /** §5: identical across all models and seeds. Changing one breaks comparability. */
+/**
+ * Whose failure was it?
+ *
+ * ⚠️ This decides what is written to a permanent public record about MODELS, so
+ * it is exported and tested rather than left inline. A transport error never
+ * reached a provider and cost nothing: it is ours. Anything the provider
+ * actually answered — a 4xx, a 5xx, a refusal, a malformed body — is a fact
+ * about that provider and a budget allocator is entitled to see it.
+ *
+ * ⚠️ It fails toward `provider_error`, not toward ours. Mistakenly keeping a row
+ * leaves a wrong entry that the append-only log preserves and this file's
+ * history explains; mistakenly dropping one silently hides a provider's failures
+ * from the component that budgets across providers, and nothing records that it
+ * happened.
+ */
+export function attributeFailure(e) {
+  const msg = `${e?.message ?? e} ${e?.cause?.code ?? ''}`;
+  const ours =
+    /fetch failed|ECONNREFUSED|ECONNRESET|EAI_AGAIN|ENOTFOUND|ETIMEDOUT|socket hang up|facilitator_unreachable|network|and_gateway_is_down/i
+      .test(msg);
+  return ours ? 'harness_error' : 'provider_error';
+}
+
 export const INTERFACE = {
   max_rounds: 8,
   budget_usd_per_run: 0.05,
@@ -269,11 +292,9 @@ export async function runAgent({
        * A local transport error — the gateway not listening, DNS, a reset
        * socket — never reached a provider and cost nothing. It is ours.
        */
-      const msg = `${e.message} ${e.cause?.code ?? ''}`;
-      const ours = /fetch failed|ECONNREFUSED|ECONNRESET|EAI_AGAIN|ETIMEDOUT|socket hang up|facilitator_unreachable/i
-        .test(msg);
-      run.rounds.push({ round, outcome: ours ? 'harness_error' : 'provider_error', detail: e.message });
-      run.stop_reason = ours ? 'harness_error' : 'provider_error';
+      const outcome = attributeFailure(e);
+      run.rounds.push({ round, outcome, detail: e.message });
+      run.stop_reason = outcome;
       return run;
     }
 

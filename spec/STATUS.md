@@ -192,6 +192,45 @@ gate" failure in a new costume — a *rule nothing can trigger*.
 4. **The fallback path** — same allocator, subgraph disabled, blind round-robin.
    It exists only to be filmed, and it is demo beat 3.
 
+## ⚠️ Incident — five false rows on a public log, 9 September
+
+Recorded here rather than only in a commit message, because this file exists to
+be the place where the state of the project is true.
+
+A transient `ECONNRESET` to the x402 facilitator escaped an unguarded
+`await verifyAndSettle(...)` and killed the gateway process. The next five batch
+seeds failed with `fetch failed`, and the harness wrote **five rows to Base
+Sepolia saying the model had produced nothing**. It was our own outage. Under the
+allocator's policy those rows are enough to bench a working model.
+
+**The rows stay.** They are on an append-only log and cannot be withdrawn, which
+is the property that makes the log worth trusting at all; redeploying the contract
+to tidy them away would be the dishonest option dressed as housekeeping. In the
+data they are indistinguishable from genuine provider errors, so this section is
+the record of what they are: rows 5–9 on
+`0x6Cc049953C21e0f23AD4a2AE791253Bb4fe18Fc0`, all `groq/openai/gpt-oss-120b`,
+all `provider_error`, all zero cost, all within one minute.
+
+| Fix | Where |
+|---|---|
+| The facilitator call is guarded and returns **502 `facilitator_unreachable`** | `gateway/server.mjs` |
+| The gateway survives an unhandled rejection instead of exiting | `gateway/server.mjs` |
+| `harness_error` is distinguished from `provider_error` by transport signature | `attributeFailure()` in `agent.mjs`, **7 tests** |
+| `recordRun` refuses to write `harness_error` — the check is **before** the write | `registry.mjs` |
+| `batch.mjs` writes registry rows and artifact bundles at all | it did neither; a batch published to Hedera and nothing to Base Sepolia |
+
+⚠️ **The rule fails toward keeping a row**, not toward dropping one. A wrongly
+kept row is visible and this section explains it; a wrongly dropped row hides a
+provider's failures from the component that budgets across providers, and leaves
+no trace that it happened.
+
+⚠️ **The instructive part is not the crash.** It is that the classification rule
+was written and shipped **untested** in the same week this repository recorded
+the lesson that *a rule nothing can trigger is not a rule* — which had itself been
+found by an allocator rule that was dead for an afternoon while its tests passed.
+The lesson was written down and not applied to the next thing written. It is
+tested now.
+
 ## ✅ Web view — DONE
 
 `web/index.html`, served by `npm run web`. It queries the subgraph **from the
