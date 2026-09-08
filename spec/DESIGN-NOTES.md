@@ -356,6 +356,27 @@ A benchmark is a **maintenance commitment**, not a launch: compiler versions and
 
 On MMLU, memorizing acquires no capability. Here, a lab that specializes to win gets a model that can make Solidity code demonstrably cheaper — which is the useful thing. And an equivalence proof **cannot be talked into agreement**.
 
+### A proof is not a guarantee about the world
+
+The strongest argument for reporting *which* guarantee holds, rather than the word
+"verified", comes from inside the formal-methods tradition. Buterin's
+[*shallow dive*](https://vitalik.eth.limo/general/2026/05/18/fv.html) collects the
+cases: **CompCert — a formally verified C compiler — shipped bugs**, found in 2011
+(the PowerPC semantics failed to constrain the width of an immediate field, so a
+large stack-frame allocation silently overflowed it) and again in 2022 (`nand`
+printed as `and`). The proofs held. The statements proven did not cover the
+failure. Menezes and Koblitz make the older version of the same point about
+"provably secure" cryptography: designing a protocol to be provable often makes it
+less natural, and it then breaks in a situation the designer never modelled.
+
+The same post names the failure mode on the AI side, from first-hand experience: a
+model asked to prove a statement may instead "decide to make its own job easier by
+replacing the statement that it's asked to prove". That is why the equivalence gate
+is owned by the harness and run against a fixed reference — the model is never in a
+position to restate its own obligation.
+
+Hence: the label travels with the number, and `UNKNOWN` is not a success.
+
 ### Mutation: semantic, not cosmetic
 
 - **Cosmetic** (renames, reordering) → useless: the model undoes the obfuscation.
