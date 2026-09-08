@@ -75,13 +75,9 @@ h2+p{margin:.15rem 0 1.1rem;color:var(--rule);max-width:64ch}
 .datum{position:absolute;left:0;right:0;border-top:2.5px solid var(--ink);
        transform:translateY(-50%)}
 .datum .cap{position:absolute;right:0;top:-1.35rem;font-size:.8rem;font-weight:600}
-.datum .val{position:absolute;left:-5.5rem;top:-.72rem;font-weight:700;
-            min-width:3.6rem;text-align:right}
 .zero{position:absolute;left:0;right:0;border-top:1px dashed var(--faint);
       transform:translateY(-50%)}
 .zero .cap{position:absolute;right:0;top:-1.3rem;font-size:.8rem;color:var(--rule)}
-.zero .val{position:absolute;left:-5.5rem;top:-.7rem;color:var(--rule);
-           min-width:3.6rem;text-align:right}
 
 /* ── tables ───────────────────────────────────────────────── */
 /* code is the fastest way to explain this to someone who reads Solidity */
@@ -121,12 +117,12 @@ tr.benched td{color:var(--rule)}
 .limits{margin-top:3rem;border-top:2px solid var(--ink);padding-top:1rem}
 .limits h2{margin-top:.5rem}
 .limits li{max-width:70ch;margin-bottom:.55rem}
+.nudge{margin:1.5rem 0 0;font-size:.8rem;color:var(--rule);max-width:66ch}
 .state{padding:1rem 0;color:var(--rule)}
 .err{color:var(--loss);max-width:70ch}
 @media (max-width:620px){
   .plot{padding-left:4.2rem}
-  .mark .val,.datum .val,.zero .val{left:-4.2rem;min-width:3rem}
-}
+  .mark .val,.datum .val,}
 @media (prefers-reduced-motion:no-preference){
   .mark{animation:in .45s ease-out both}
   @keyframes in{from{opacity:0;transform:translateY(-50%) translateX(-6px)}}
@@ -288,11 +284,86 @@ function plot(runs) {
   const hi = Math.max(...vals), lo = Math.min(...vals);
   const pad = Math.max(12, (hi - lo) * 0.08);
   const top = hi + pad, bot = lo - pad;
-  const H = Math.max(260, scored.length * 42);
-  const y = (v) => ((top - v) / (top - bot)) * 100;
+  // Tall enough that the clearances below cannot conflict: with two reference
+  // lines to keep clear of, a short band forces one adjustment to undo another.
+  let H = Math.max(420, scored.length * 34);
+  const yPx = (v) => ((top - v) / (top - bot)) * H;
 
-  const marks = scored.map((r) => `
-    <div class="mark ${r.v < 0 ? "neg" : ""}" style="top:${y(r.v).toFixed(2)}%">
+  /**
+   * ⚠️ Marks are pushed apart where they would collide. With real data several
+   * runs land within a few gas of each other and the labels overprinted into an
+   * unreadable smear — the plot became less honest than a list.
+   *
+   * Only the vertical POSITION is nudged, never the number: every mark prints
+   * its own value, and the order is preserved. The band is extended rather than
+   * compressed so nothing is clamped against an edge, and the note under the
+   * plot says this is happening.
+   */
+  const MIN = 21;
+  const placed = scored
+    .map((r) => ({ ...r, y: yPx(r.v) }))
+    .sort((a, b) => a.y - b.y);
+  let nudged = false;
+  const separate = () => {
+    for (let i = 1; i < placed.length; i++) {
+      if (placed[i].y - placed[i - 1].y < MIN) {
+        placed[i].y = placed[i - 1].y + MIN;
+        nudged = true;
+      }
+    }
+  };
+  separate();
+
+  /**
+   * ⚠️ Clear the reference lines too, and clear them IN THE DIRECTION OF THE
+   * MARK'S OWN SIGN. A run at +43 landed on top of the +69 rule and read as if
+   * it were the floor — the one misreading this plot exists to prevent. Pushing
+   * it down keeps it below the line, which is where 43 belongs; pushing a mark
+   * above the line upward keeps it above. A mark never crosses a reference it
+   * did not already cross.
+   */
+  // ⚠️ Must exceed the label's own line height, not merely be non-zero: at 15px
+  // the rule still struck through the text of the mark it had just cleared.
+  const CLEAR = 26;
+  for (const ref of [{ v: FLOOR, y: yPx(FLOOR) }, { v: 0, y: yPx(0) }]) {
+    for (const m of placed) {
+      if (Math.abs(m.y - ref.y) < CLEAR) {
+        m.y = m.v >= ref.v ? ref.y - CLEAR : ref.y + CLEAR;
+        nudged = true;
+      }
+    }
+  }
+  placed.sort((a, b) => a.y - b.y);
+  separate();
+  /**
+   * ⚠️ THE GUARD. Everything above is cosmetic; this is not. A mark that ends up
+   * on the wrong side of a reference line states something false — that a run
+   * beat the floor when it did not — and that is the single misreading this plot
+   * exists to prevent.
+   *
+   * It already happened twice while building this: clearing the floor line
+   * pushed a +43 run down into the zero line's clearance, which pushed it back
+   * up above the floor. Two correct-looking adjustments composed into a lie.
+   *
+   * So the placement is CHECKED against the data it came from, and any mark that
+   * changed sides is returned to its true position — overlapping is a cosmetic
+   * defect, misreporting is not.
+   */
+  for (const m of placed) {
+    for (const ref of [{ v: FLOOR, y: yPx(FLOOR) }, { v: 0, y: yPx(0) }]) {
+      const trulyAbove = m.v > ref.v;
+      const drawnAbove = m.y < ref.y;
+      if (m.v !== ref.v && trulyAbove !== drawnAbove) {
+        m.y = yPx(m.v);
+        m.exact = true;
+      }
+    }
+  }
+  if (placed.length) H = Math.max(H, Math.max(...placed.map((m) => m.y)) + MIN);
+  const y = (v) => (yPx(v) / H) * 100;
+
+  const marks = placed.map((r) => `
+    <div class="mark ${r.v < 0 ? "neg" : ""}" style="top:${((r.y / H) * 100).toFixed(2)}%">
       <span class="val">${r.v > 0 ? "+" : ""}${r.v}</span>
       <span class="dot"></span>
       <span class="who">${esc(r.model.name.split("/").pop())}</span>
@@ -300,13 +371,15 @@ function plot(runs) {
         Number(r.maxRegression) > 0 ? ` · worst input +${r.maxRegression} gas` : ""}</span>
     </div>`).join("");
 
-  return `<div class="plot"><div class="band" style="--h:${H}px">
+  return `<div class="plot"><div class="band" style="--h:${Math.round(H)}px">
     ${marks}
     <div class="datum" style="top:${y(FLOOR).toFixed(2)}%">
-      <span class="val">+${FLOOR}</span><span class="cap">one-word edit</span></div>
+      <span class="cap">one-word edit &nbsp;+${FLOOR}</span></div>
     <div class="zero" style="top:${y(0).toFixed(2)}%">
-      <span class="val">0</span><span class="cap">no change</span></div>
-  </div></div>`;
+      <span class="cap">no change &nbsp;0</span></div>
+  </div></div>${nudged ? `<p class="nudge">Runs that land within a few gas of each other are
+  drawn slightly apart so their labels stay readable. Every mark prints its own value; the two
+  reference lines are at their exact positions.</p>` : ""}`;
 }
 
 function models(ms) {
