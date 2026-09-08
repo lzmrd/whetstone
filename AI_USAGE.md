@@ -57,10 +57,23 @@ The directional decisions that shaped the project were made by the builder, not 
 - Asked how `RunRegistry` learns about a run, exposing that the registry is a log and not an oracle
 - Required that the subgraph's indispensability be *shown* in the demo rather than asserted
 
-## Hand-written by the human, by design
+## The human contribution, stated once
 
-⚠️ **This section changed on day 1, and the change weakens it. Recorded rather than
-quietly dropped.**
+⚠️ **This section was headed *"Hand-written by the human, by design"* and that
+heading was false against its own file.** It listed artifacts that the per-file
+table below marks `HA` (AI-assisted) and that the closing paragraph describes as
+not hand-written — three incompatible statements about the same artifacts in one
+document. The heading is the one that was wrong, and it is corrected rather than
+the table.
+
+**The accurate statement, made once and not contradicted below**: nothing in this
+repository is a substantial hand-written human artifact. The human contribution is
+**direction, constraint and rejection**, plus the pinned price table. What follows
+is what that direction produced and why each piece is load-bearing — not a claim
+about who typed it.
+
+⚠️ **This section also changed on day 1, and the change weakens it. Recorded rather
+than quietly dropped.**
 
 Earlier drafts named `restored_f` — solady's implementation with OpenZeppelin's
 checks restored — as the human contribution, and rule **R2** required it be
@@ -95,7 +108,9 @@ Kept current as code lands. `H` = hand-written, `A` = AI-generated, `HA` = AI-as
 | `contracts/test/Scenario.sol` | HA | Fixture vector and its content digest |
 | `contracts/test/GasMeter.sol`, `OrderControl.t.sol`, `HarnessSelfCheck.t.sol` | HA | The instrument and its controls |
 | `scripts/equiv.sh`, `scripts/selfcheck.sh` | HA | Equivalence runner and the per-run gate check |
-| `harness/src/*.mjs` | HA | Payment and model-access smoke tests |
+| `harness/src/*.mjs` | HA | The whole harness: payment, gates, guarantee labelling, receipts, batch records |
+| `scripts/bootstrap.sh` | HA | Pinned toolchain provisioning, sha256-verified |
+| `contracts/src/tasks/NegativeControl.sol` | HA | The mutation proof 2b must refuse |
 | `harness/src/prices.json` | **H** | Prices transcribed by hand from the published page; source URL, date and sha256 recorded in the file |
 | **the mutation `M`** (`contracts/src/tasks/Task.sol`, `Baseline.sol`) | ⚠️ **A** — model-written | Written by Claude on 7 September at the builder's explicit instruction. See below |
 
@@ -141,6 +156,11 @@ Recorded here rather than left for a judge to work out.
 This project uses a spec-driven workflow with plain Markdown rather than a framework (OpenSpec, Kiro, spec-kit). Per the rules, all spec files, prompts and planning artifacts are in this repository:
 
 - `spec/` — specification, runbook, design notes, decision log
-- `spec/prompts/` — the design conversation transcript
+- `spec/prompts/` — ⚠️ **the design conversation transcript is NOT yet exported.**
+  The directory holds a placeholder README saying so. ETHGlobal's rule requires
+  prompts and planning artifacts to be in the repository, and this part of it is
+  **not satisfied**. Stated plainly here rather than left as a directory a reader
+  discovers is empty. The specification, decision log and design notes — which are
+  the planning artifacts the rule is aimed at — are present and complete.
 
 The specification went through ten revisions before implementation began; the decision log records what was rejected at each step and why.

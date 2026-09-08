@@ -663,13 +663,50 @@ The task applies `+1` as checked Solidity arithmetic; the baseline applies it
 inside assembly, unchecked. Measured cost of that difference: **52 992 gas over
 768 inputs, 69 gas/call — 24% of the whole gap.**
 
-That is not a defect to remove. It is **the price of the semantics solady drops**,
-the D-04 by-product thought lost when `mulDiv` returned `UNKNOWN` — and here it is
-measurable, on a target where both sides are *proved equivalent*. But it must be
-**published as a decomposition** rather than left invisible inside the gap:
+The **decomposition** stands and is worth publishing, because 24% of a gap hidden
+inside one number is 24% nobody can argue with:
 
 ```
 283 gas/call total gap
- ├─  69  checked vs unchecked arithmetic   (the price of the dropped semantics)
+ ├─  69  checked vs unchecked arithmetic   (an artifact of M — see below)
  └─ 214  the algorithm
 ```
+
+### ⚠️ Addendum 10 — the reading of those 69 gas is RETRACTED
+
+They were published above as *"the price of the semantics solady drops"*, the D-04
+by-product thought lost on `mulDiv`. **That is wrong twice over**, and the argument
+against it was already in this repository, written by us, in `Trivial.sol`.
+
+**First: the check is proved dead.** Proof 3 requires `hevm(Trivial ≡ Candidate)` to
+PASS, and the reason is stated in the file — *"if hevm refuses, the removed check
+was NOT dead and those gas were buying real behaviour"*. It passes. So the overflow
+check can never fire: `r` is a byte index bounded by 31, and `r + 1` cannot
+overflow. Solidity emits the check only because the compiler cannot prove that
+bound. **Dead code buys no semantics.** Those 69 gas are the price of a proof the
+optimizer could not perform — not of a guarantee solady declined to offer.
+
+**Second: they are an artifact of our own mutation, applied asymmetrically.** §4
+says "the same `M` applied by hand to both sides". In fact:
+
+| side | how `M` adds one |
+|---|---|
+| `Task.sol:26` | `... + 1` in Solidity → **checked** |
+| `Baseline.sol:29` | `r := add(r, 1)` in assembly → **unchecked** |
+
+`M` was applied *idiomatically*, not *identically*. The unmutated original returns
+`r` and performs no addition at all, so this overhead **did not exist before the
+mutation**: 24% of the denominator is a cost `M` introduced on one side only.
+
+**What survives**: the decomposition, the floor, and the number. A one-word
+`unchecked` still recovers 69 gas/call, and a model that does not find it still
+has not understood the code — the floor works regardless of where the 69 gas came
+from. **What does not**: the claim that this recovers the D-04 by-product. That
+by-product was withdrawn for lack of proof on `mulDiv` and it stays withdrawn;
+relabelling an artifact of our own mutation as "the price of semantics" is an
+equivocation on the word.
+
+⚠️ Found by adversarial review, not by the apparatus. Recorded under the same rule
+as [Addendum 4](#) and [Addendum 8](#) — with the difference that this retraction
+removes a *favourable* reading rather than an unfavourable result, which is the
+asymmetry [D-15](../DECISIONS.md) exists to name.

@@ -122,6 +122,41 @@ measured every run rather than assumed.
 > `toHexString` carries the headroom (7 703 gas per call) and therefore carries the
 > risk of the weaker label. That asymmetry is the finding, not a flaw in it.
 
+#### ⚠️ The pre-declared outcome was FALSIFIED. Recorded here, not in a footnote.
+
+The null result above did not happen. Across 22 scored runs the model beat the
+solady baseline outright on **6**, with a maximum `relative_progress` of **1.3668**
+— 136.7% of a baseline described one paragraph earlier as "already squeezed by
+Vectorized".
+
+**The cause is the toolchain, not the model.** 24 of the accepted patches contain:
+
+```solidity
+assembly { lz := clz(x) }
+r = (256 - lz + 7) >> 3;
+```
+
+`clz` is reachable because `foundry.toml` pins `evm_version = 'osaka'`. solady
+v0.1.26 — the baseline — was written before that opcode existed. So on this target
+"beating the baseline" does not mean "beating an expert"; it means **using an
+instruction the expert's code predates**. `gas(OZ_M) − gas(solady_M)` is a
+denominator with a dated numerator, and `relative_progress` above 1.0 measures the
+gap between EVM versions at least as much as it measures the model.
+
+⚠️ **Why this paragraph exists at all.** This repository has written three addenda
+to retract results that were inconvenient, and had written *nothing* to record a
+pre-registration it falsified in its own favour — the fact appeared once, in
+passing, at [DAY1-RESULTS.md](spike/DAY1-RESULTS.md) ("the model reached for
+`clz`"). Retracting only what is unflattering is not rigour, it is selection. The
+asymmetry was found by adversarial review, not by us.
+
+**Status of the fix**: the finding is recorded; the denominator is *not* yet
+corrected. The two candidate repairs — a `solady_M + clz` baseline, or compiling to
+`cancun` and declaring the divergence from OpenZeppelin's own config — both change
+every published gas number, so neither is made mid-week. Until one lands, every
+`relative_progress` figure in this repository must be read with this section
+attached. See [D-15](DECISIONS.md).
+
 ### Baseline construction — bilateral mutation
 
 ⚠️ Earlier drafts claimed that because OZ and solady are proven equivalent on these
@@ -297,12 +332,35 @@ round 2 : + gate feedback ──────────────►  patch
            gas delta so far)
           …
 stop when: budget exhausted, OR max_rounds reached,
-           OR two consecutive rounds with no gas improvement
+           OR the first patch that PASSES the gates
 ```
 
-**Multi-turn with gate feedback**, not single-shot. Rationale: single-shot measures
-recall; iterating against a counterexample measures whether the model can use
-evidence. That is the capability the project claims to measure.
+**Multi-turn with gate feedback**, not single-shot — but ⚠️ **read the stop rule
+above carefully, because it is weaker than the sentence that follows it.**
+
+Rationale for iterating: single-shot measures recall; iterating against a
+counterexample measures whether the model can use evidence.
+
+⚠️ **That rationale does not apply to the runs that produce the headline numbers.**
+The loop stops at the first patch that passes the gates ([`agent.mjs`](../harness/src/agent.mjs),
+`stop_reason: 'proved'`), so a model that succeeds immediately is never asked to
+improve. Measured over the 22 scored runs to date: **16 used exactly one round**,
+5 used two, 1 used three. What is measured is therefore *"the quality of the first
+accepted patch"*, not *"how well the model optimises given feedback"*.
+
+The consequence worth stating plainly: **only failure earns feedback and further
+attempts.** Round budget is allocated in inverse proportion to competence, which
+is a defect in the independent variable of a project whose thesis is
+comparability.
+
+⚠️ This section previously declared a third stop condition — *"two consecutive
+rounds with no gas improvement"* — that **has never existed in the code**. The
+specification described a keep-going-until-it-plateaus loop while the harness ran
+a stop-at-first-success loop, and every published number came from the latter. The
+spec is corrected to the code rather than the reverse: implementing the plateau
+rule now would change what every run measures and make this week's numbers
+incomparable with themselves. Deferred, and named as a limitation rather than
+carried as a false description. Found by adversarial review.
 
 ⚠️ **Feedback is mechanical output only** — the compiler's error, the failing input,
 the gas number. No hints, no guidance, nothing hand-written per model.
@@ -386,6 +444,33 @@ saved **0 gas, sat 69 below the floor, and regressed one input by 185**.
 | `FORMAL_BOUNDED` | Checker terminated **with bounds**; bounds and assumptions in the receipt |
 | `FUZZED` | Campaigns, seeds, corpus, ranges, and what was compared |
 | `UNKNOWN` | Timeout, unsupported opcode, undecided. **Not a success** |
+
+⚠️ **`REFUTED` is a fifth value and belongs on this list.** `equivalence.mjs`
+returns it when the checker produces a counterexample. It is not a guarantee
+label — it is the gate rejecting the patch, and no patch bearing it is ever
+scored — but "one of these four, never anything else" was written while the code
+returned five, and the honest fix is to name the fifth rather than to pretend the
+sentence was true.
+
+### ⚠️ Status: this vocabulary currently prints ONE label
+
+This document says three times that a guarantee vocabulary which always prints
+the same label is decoration. By its own standard, today it is:
+
+| Label | Emitted? |
+|---|---|
+| `FORMAL_NO_EXPLICIT_INPUT_BOUND` | **22 of 22** scored runs |
+| `FORMAL_BOUNDED` | never — the harness always passes `--max-iterations -1`, so the bounded branch is unreachable in practice |
+| `FUZZED` | never — reachable only when hevm returns `UNKNOWN`, which `log256` never does |
+| `UNKNOWN` | never on the scored target |
+
+The label that would exercise the rest of the vocabulary is `toHexString`, where
+hevm does not terminate — and it is a stretch target that has not been built. So
+the machinery for all four exists and is tested ([`selfcheck.sh`](../scripts/selfcheck.sh)
+asserts all three directions, including that an incomplete exploration cannot earn
+a FORMAL label), but the *evidence* that it discriminates in production is one
+label wide. Recorded here rather than left for a reader to derive from the batch
+files.
 
 ⚠️ Never write *"proven, no bounds"*. The EVM word is already 256-bit, the wrapper narrows the domain, the solver uses heuristics. hevm proves **bytecode** equivalence: imports, linking, ABI encoding, dispatcher, optimizer, metadata, solc version and wrapper parameters **must be serialized into the receipt**, or the label means nothing.
 

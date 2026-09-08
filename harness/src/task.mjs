@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compileToRuntime } from './compile.mjs';
 import { equivalent } from './equivalence.mjs';
+import { mutationStrength } from './differential.mjs';
 import { stripComments, assertClean } from './prompt.mjs';
 
 const REPO = fileURLToPath(new URL('../../', import.meta.url));
@@ -78,6 +79,43 @@ export async function prepareTask(manifest) {
   }
 
   /**
+   * proof 2b — HOW MUCH of the domain the mutation moved.
+   *
+   * ⚠️ Proof 2 is an existence claim: hevm refutes `task == original` as soon as
+   * ONE input differs. R4 asks for something stronger — that a memorised answer
+   * become wrong — and a `revert` bolted in front of an untouched body satisfies
+   * proof 2 while leaving the memorised body correct on every other input.
+   * Task.sol argues against exactly that mutation; the gate could not tell the
+   * two apart, and §4 nevertheless described it as turning R4 into a gate.
+   *
+   * ⚠️ The threshold is DECLARED, not derived. A semantic mutation must move at
+   * least half of the committed scenario. The mutation in use moves 769 of 769;
+   * the bare-revert variant would move 1. Nothing in between has been argued
+   * about, so the line is drawn where it separates those two by a wide margin
+   * and it is written here rather than tuned to whatever passed.
+   *
+   * ⚠️ Demonstrated to fire, not believed to: `contracts/src/tasks/NegativeControl.sol`
+   * is the bare-revert variant, and `manifest-negative.json` runs it through this
+   * function. It passes proof 2 and is refused here at 1/769.
+   */
+  const strength = await mutationStrength(task.path, original.path);
+  if (kind === 'semantic' && strength.fraction < 0.5) {
+    throw new Error(
+      `proof 2b FAILED: the mutation changes behaviour on only ${strength.diverged}/${strength.total} ` +
+        `(${(strength.fraction * 100).toFixed(1)}%) of the scenario. hevm refuted equivalence, so a ` +
+        `divergence exists, but a memorised answer stays correct almost everywhere. R4 is not ` +
+        `satisfied by an existence claim. Do not score.`,
+    );
+  }
+  if (kind === 'control' && strength.diverged !== 0) {
+    throw new Error(
+      `proof 2b FAILED: this is declared a CONTROL and it diverges from the original on ` +
+        `${strength.diverged}/${strength.total} scenario inputs. hevm proved them equivalent, so ` +
+        `these two results contradict each other and one of the instruments is wrong. Do not score.`,
+    );
+  }
+
+  /**
    * proof 3 — the trivial floor must be PROVED identical to the task.
    *
    * ⚠️ Not ceremony. The floor claims that a one-word edit recovers 69 gas while
@@ -107,6 +145,7 @@ export async function prepareTask(manifest) {
     original,
     proof_1: p1.label,
     proof_2: p2.label,
+    mutation_strength: strength,
     // Only a semantic variant can claim this.
     mutation_refuted: kind === 'semantic',
   };

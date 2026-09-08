@@ -189,3 +189,17 @@ Instrument 2's bias, measured by running the same comparison in both orders: **5
 **The general lesson, and the reason this is a decision and not a bugfix**: a project whose thesis is measurement rigour was three times wrong about its own measurement, and each time the wrong number was plausible enough to be written down. Controls are therefore part of the harness, not part of the debugging.
 
 ⚠️ A zero result must itself be controlled. Zero spread is exactly what a bug that sent the same argument 769 times would produce — and "stable" was the property being sought, so it would have been believed. `HarnessSelfCheck.t.sol` asserts the scenario produces 94 distinct results, and `toHexString`, measured by the same instrument in the same run, has a spread of 15 710.
+
+---
+
+## D-15 · A falsified pre-registration is a result, and gets written down like one
+
+**Decided**: the null result pre-declared in [WHETSTONE §1](WHETSTONE.md) was falsified by the measured runs, and the falsification is recorded in the specification body rather than left implicit in a spike log. The `relative_progress` denominator is **known to be dated** and is not corrected this week.
+
+**The evidence**: 22 scored runs, 6 above 100% of the solady baseline, maximum **1.3668**. 24 accepted patches use `clz`, an opcode reachable only because `foundry.toml` pins `evm_version = 'osaka'`; solady v0.1.26 predates it.
+
+**Why it is a decision and not a correction**: the fact was already in the repository — once, in passing, in a spike log. What was missing was the *entry in the ledger*. This project had by then written three addenda retracting results that were unflattering and none recording a prediction it broke in its own favour. That asymmetry is the exact failure mode pre-registration exists to prevent, and it was found by adversarial review rather than by the apparatus.
+
+⚠️ **The repair is deliberately deferred.** Both candidates — a `solady_M + clz` baseline, or compiling to `cancun` and declaring the divergence from OpenZeppelin's own `foundry.toml` — invalidate every gas figure already published. Changing the denominator two days before submission would produce numbers with less scrutiny behind them than the ones they replace. The honest move is to publish the flaw at full strength and leave the numbers standing beside it.
+
+**What this costs**: `relative_progress` cannot be read as "fraction of the expert gap closed by the model". It is a fraction of the gap between OpenZeppelin's implementation and a 2024 expert implementation, closed by a model with a 2026 instruction set. Absolute `gas/call` and the comparison against the trivial floor are unaffected — neither involves the baseline.

@@ -8,11 +8,27 @@
 
 import { createHash } from 'node:crypto';
 
-/// ⚠️ §5 forbids these from ever reaching the model. Two separate reasons:
-///   · "openzeppelin"/"solady" would let the model identify the upstream source,
-///     recall the known implementation, and diff its way back to the mutation --
-///     which is the whole anti-memorisation defence, gone.
-///   · "whetstone" would let it recognise the benchmark itself.
+/// ⚠️ §5 forbids these from ever reaching the model.
+///
+/// ⚠️ WHAT THIS IS NOT. This filter is not "the anti-memorisation defence in
+/// operational form", as an earlier comment claimed. The file it redacts is the
+/// OpenZeppelin implementation nearly verbatim -- same constants, same shift
+/// chain -- so any model that has seen the library recognises the FUNCTION with
+/// or without the word "openzeppelin" in it. Token filtering cannot hide code
+/// that is recognisable by construction, and D-05 says outright that both
+/// libraries are in every model's training data.
+///
+/// What it actually buys, stated at its real size:
+///   · dropping the library names removes the cheapest cue for pulling the exact
+///     upstream text into context and diffing against it. Recall from weights is
+///     noisy; a verbatim quotation the model has just written is not. Raising the
+///     cost of the precise operation is worth doing and is not a defence.
+///   · "whetstone" would let it recognise the BENCHMARK, which is a different
+///     concern from recognising the function and the only one this fully solves.
+///
+/// The anti-memorisation defence is the semantic mutation `M` and the proofs
+/// that gate it -- a memorised answer is admitted and then REJECTED, which is
+/// why the defence survives being read about.
 export const FORBIDDEN = ['openzeppelin', 'solady', 'whetstone', 'vectorized', 'mulDiv'];
 
 export const SYSTEM_PROMPT = `You optimise Solidity functions for gas.

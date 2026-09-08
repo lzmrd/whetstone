@@ -1,0 +1,8 @@
+{
+  "_comment": "NEGATIVE CONTROL. Must be REFUSED by proof 2b. Never scored, never sent to a model. It exists so that a gate is demonstrated to fire rather than believed to.",
+  "id": "NEGATIVE-CONTROL-bare-revert",
+  "kind": "semantic",
+  "task":     { "path": "contracts/src/tasks/NegativeControl.sol", "contract": "BareRevert", "sig": "f(uint256)" },
+  "baseline": { "path": "contracts/src/tasks/NegativeControl.sol", "contract": "BareRevert" },
+  "original": { "path": "contracts/src/tasks/Original.sol", "contract": "Original" }
+}

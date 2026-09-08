@@ -54,3 +54,28 @@ export async function differential(taskHex, patchHex) {
     return { passed: false, gate, counterexample: cex, output: out };
   }
 }
+
+/**
+ * How much of the committed scenario the mutation actually moved.
+ *
+ * ⚠️ The companion to proof 2, and the reason proof 2 alone was not the gate §4
+ * claimed. hevm refuting `task == original` establishes that a divergent input
+ * EXISTS. R4 needs more than that: a memorised answer has to become wrong, and a
+ * mutation that diverges on one input in 2**256 leaves it right everywhere else.
+ * One is an existence claim, the other is about measure.
+ *
+ * @returns {{diverged: number, total: number, fraction: number}}
+ */
+export async function mutationStrength(taskHex, originalHex) {
+  const env = { ...process.env, TASK_HEX: taskHex, ORIGINAL_HEX: originalHex };
+  const { stdout } = await run(
+    'forge',
+    ['test', '--match-test', 'test_mutation_strength', '-vv'],
+    { cwd: REPO, env, maxBuffer: 32e6 },
+  );
+  const m = stdout.match(/WHETSTONE_DIVERGENCE (\d+) (\d+)/);
+  if (!m) throw new Error(`mutation strength did not report a number:\n${stdout}`);
+  const diverged = Number(m[1]);
+  const total = Number(m[2]);
+  return { diverged, total, fraction: Number((diverged / total).toFixed(4)) };
+}

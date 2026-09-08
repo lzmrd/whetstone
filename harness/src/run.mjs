@@ -11,6 +11,7 @@
 import { runAgent, INTERFACE } from './agent.mjs';
 import { checkerVersion } from './equivalence.mjs';
 import { resolve, TABLE_HASH } from './providers.mjs';
+import { exportArtifacts } from './artifacts.mjs';
 import { buildReceipt, publishReceipt } from './receipt.mjs';
 import { loadManifest, prepareTask } from './task.mjs';
 import { requireSelfCheck } from './selfcheck.mjs';
@@ -96,6 +97,12 @@ cost/1k gas  $${((run.usd / Math.max(g.saved_total, 1)) * 1000).toFixed(8)} per 
     payment: run.payments?.[0] ?? null,
     payments: run.payments,
   });
+
+  // ⚠️ Written BEFORE the receipt is published. The bundle is what makes the
+  // receipt checkable; publishing a pointer to inputs nobody can fetch was the
+  // gap this closes.
+  const bundle = exportArtifacts({ receipt, prepared, run });
+  console.log(`\nartifacts    ${bundle.dir}/  (${bundle.files.length} files, see RECOMPUTE.md)`);
 
   if (process.env.HCS_TOPIC_ID && process.argv.includes('--no-receipt') === false) {
     const ptr = await publishReceipt(receipt);

@@ -16,9 +16,10 @@
 #      and both wrote numbers into the spec before anyone checked.
 #
 # A load-bearing property verified once by hand is not a property, it is a
-# memory. Both are now asserted on every run, in both directions: a checker
+# memory. Both are now asserted on every run, in ALL THREE directions: a checker
 # that called everything different would pass the negative test and fail the
-# positive one.
+# positive one, and a checker that called an unfinished exploration a proof would
+# pass both and fail the third.
 set -uo pipefail
 
 # ⚠️ equiv.sh exits non-zero on a refutation, which for check 1 is the SUCCESS
@@ -42,7 +43,7 @@ echo "  hevm  $HEVM_VERSION"
 echo "  solc  $SOLC_VERSION"
 echo "  forge $FORGE_VERSION"
 
-step "gate check 1/2 (negative) — hevm must REFUSE two contracts differing only in revert payload"
+step "gate check 1/3 (negative) — hevm must REFUSE two contracts differing only in revert payload"
 if grep -q 'NOT EQUIVALENT' <<<"$(run ./scripts/equiv.sh RevertA RevertB 'f(uint256)')"; then
   ok "revert payloads are compared — the equivalence gate covers the case our targets diverge on"
 else
@@ -52,11 +53,42 @@ else
   echo "     comparing them without it being a regression on their side."
 fi
 
-step "gate check 2/2 (positive) — hevm must ACCEPT two contracts that genuinely agree"
+step "gate check 2/3 (positive) — hevm must ACCEPT two contracts that genuinely agree"
 if grep -q 'LABEL: FORMAL' <<<"$(run ./scripts/equiv.sh SameA SameB 'f(uint256)')"; then
   ok "a real equivalence is still provable — the checker is not simply saying 'different'"
 else
   bad "hevm failed to prove x & 0xff equivalent to x % 256. The checker is not trustworthy."
+fi
+
+step "gate check 3/3 (incomplete) — partial exploration must NEVER earn a FORMAL label"
+#
+# ⚠️ The third direction, and the only dangerous one. Checks 1 and 2 fail toward
+# REFUSAL, which is safe. This one guards the path that fails toward an
+# OVERCLAIM: if hevm's wording changes, an exploration that stopped early could
+# be read as a completed proof and UNKNOWN would silently become
+# FORMAL_NO_EXPLICIT_INPUT_BOUND. It had been verified zero times, on a project
+# that pins the checker version precisely because its behaviour is undocumented.
+#
+# `toString` returns `string memory` and is intractable for the symbolic engine;
+# bounding iterations makes the incompleteness fast and deterministic (~6 s)
+# rather than waiting for a solver to exhaust memory.
+#
+# ⚠️ The assertion is on the LABEL, not on the marker string. Observed with hevm
+# 0.58.0: a partial exploration is reported as [FAIL] + a partial warning, never
+# as [PASS] + a partial warning -- so the PASS and partial markers appear to be
+# mutually exclusive and the overclaim may not currently be reachable at all.
+# That is an observation about one version of an undocumented behaviour, which is
+# exactly the class of fact this file exists to stop believing. Asserting the
+# label covers the case whichever internal marker moves.
+out3=$(MAXITER=1 TIMEOUT=20 SOLVERS=1 run ./scripts/equiv.sh OzToString SdToString 'f(uint256)')
+if grep -q 'LABEL: UNKNOWN' <<<"$out3"; then
+  ok "an incomplete exploration is labelled UNKNOWN, not proved"
+elif grep -q 'LABEL: FORMAL' <<<"$out3"; then
+  bad "an INCOMPLETE exploration earned a FORMAL label. Every proof claim in this repo is suspect."
+  echo "     hevm stopped early and the harness read it as a completed proof."
+  echo "     This is the one failure direction that overclaims instead of refusing."
+else
+  bad "the intractable pair produced neither UNKNOWN nor FORMAL — the label logic no longer matches hevm's output"
 fi
 
 step "instrument check — gas measurement must be order-neutral, and the scenario must be the committed vector"

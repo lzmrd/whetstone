@@ -15,26 +15,14 @@
  * Run:  cd harness && npm run access
  */
 
-import { TABLE, allPriced } from './providers.mjs';
+import { TABLE, allPriced, isRedTeam } from './providers.mjs';
 
 /**
- * R14 — a model used to red-team this project must never be scored by it.
- * Exact ids, because a substring match on "luna" also hits sao10k/l3-lunaris-8b,
- * which has nothing to do with the reviewer. Checked on EVERY probe: a curated
- * selection is a memory, a check is a property.
+ * R14 is enforced in providers.mjs `resolve()`, the one path every entry point
+ * takes. This probe keeps its own check because it does NOT call resolve(): it
+ * walks the price table directly, and a reviewer with a price entry should be
+ * caught here too, at the earliest point a human looks at the list.
  */
-const RED_TEAM = new Set([
-  'groq/qwen/qwen3.8-27b',
-  'openrouter/qwen/qwen3.8-27b',
-  'openrouter/qwen/qwen3.8-max-0902',
-  'openrouter/qwen/qwen3.8-flash',
-  'openrouter/qwen/qwen3.8-2.4t-a95b',
-  'openrouter/z-ai/glm-5.3',
-  'openrouter/z-ai/glm-5.3-flash',
-  'openrouter/moonshotai/kimi-k3',
-  'openrouter/openai/gpt-5.6-luna',
-  'openrouter/openai/gpt-5.6-luna-pro',
-]);
 
 function classify(status, body) {
   if (/free tier can only be used in OpenCode/.test(body)) return ['FREE-TIER GATED', 'API blocked; client-only'];
@@ -47,7 +35,7 @@ let usable = 0;
 const targets = allPriced();
 console.log(`\nProbing ${targets.length} priced model(s) across ${Object.keys(TABLE.providers).length} provider(s)\n`);
 
-const leaked = targets.filter((t) => RED_TEAM.has(t.spec) || RED_TEAM.has(t.spec.replace(/:batch$/, '')));
+const leaked = targets.filter((t) => isRedTeam(t.spec));
 if (leaked.length > 0) {
   console.error(`\n✗ R14 VIOLATION — these reviewed this project and must not be scored by it:`);
   for (const t of leaked) console.error(`    ${t.spec}`);

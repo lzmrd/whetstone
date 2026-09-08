@@ -2,14 +2,23 @@
 
 **Making an LLM optimize gas has already been done. Measuring it with declared guarantees has not.**
 
-Whetstone runs open-weight models against Solidity optimization tasks under a real, on-chain budget, and reports three things together: **how much gas was saved**, **what it cost to get there**, and **what level of correctness guarantee actually backs each patch**.
+Whetstone runs open-weight models against Solidity optimization tasks, meters and settles every single inference call on-chain, and reports three things together: **how much gas was saved**, **what it cost to get there**, and **what level of correctness guarantee actually backs each patch**.
+
+⚠️ **"On-chain budget" would be an overstatement, so it is not claimed.** Payer and
+payee are both testnet accounts of the builder: the HBAR makes a round trip. What
+the payment rail demonstrates is *metering and settlement per call*, not financial
+constraint — and the declared `budget_usd_per_run` has never actually bound a run,
+because a five-seed batch costs $0.003–0.012 in list-price terms against a $0.05 cap.
 
 > 🚧 **Status: the vertical slice runs end to end.** x402 challenge → settled
 > Hedera payment → inference → symbolic equivalence → gas over a fixed scenario →
-> receipt on HCS, read back and hash-checked.
-> ⚠️ Not yet a benchmark run: the task is a placeholder and no mutation has been
-> applied, which every receipt records as `mutation_refuted: false`. The registry
-> on Base Sepolia and the subgraph are next.
+> receipt on HCS, read back and hash-checked. The semantic mutation is applied and
+> its three proof obligations are enforced before any run is scored, so receipts
+> now carry `mutation_refuted: true`. A cosmetic control task has been run against
+> it and the result is **a tie** — reported as one.
+> ⚠️ Still missing: the `RunRegistry` on Base Sepolia and the subgraph, and with
+> them the allocator. Until those exist, the architecture diagram below describes
+> a design, not a running system.
 > Built for [ETHOnline 2026](https://ethglobal.com/events/ethonline2026), Start Fresh track. Solo builder.
 
 ---
@@ -123,6 +132,11 @@ Three environments, each with a distinct and non-overlapping role.
 
 **Why the subgraph is load-bearing**: it is the allocator's memory across rounds. Disable it and the allocator falls back to blind round-robin — the demo shows both.
 
+⚠️ That demo **illustrates the architecture; it does not prove the subgraph is
+necessary.** An allocator built to read its history from the subgraph will of
+course degrade when the subgraph is removed. Filming it is a description of the
+design, not evidence for it, and it is presented as such.
+
 ---
 
 ## Payment flow
@@ -150,14 +164,26 @@ Every model call is paid for on-chain, per call, before the response is used.
 
 ## Setup
 
-> To be completed as the implementation lands.
-
 ```bash
-cp .env.example .env     # fill in keys — see comments in the file
-forge build              # toolchain is pinned in foundry.toml
+./scripts/bootstrap.sh   # pinned libraries + solc, hevm, bitwuzla, z3 (~60 MB)
+source .envrc.sh         # .tools and Foundry ahead of the system PATH
+forge test               # 7 tests: instrument controls, gates, gas scenario
+./scripts/selfcheck.sh   # the gate self-check, in both directions
 ```
 
-Requirements: Foundry, Node 18+, a funded Hedera testnet account, a funded Base Sepolia account.
+`lib/` and `.tools/` are not committed (vendored tarballs and large binaries), so
+`bootstrap.sh` is what makes a clone reproducible rather than merely readable.
+**Every version it installs is part of the claim, not packaging**: gas numbers are
+comparable only under the pinned solc, and an equivalence label only means what it
+says under the checker and solver that produced it. The four binaries are verified
+by sha256 against the exact builds that produced the published receipts, and a
+mismatch is a hard failure.
+
+Verified on a clean clone: bootstrap → `forge test` (7 passed) → runtime bytecode
+**byte-identical** to this repository's.
+
+To run a *paid* model call as well: Foundry, Node 20+, a funded Hedera testnet
+account, and `cp .env.example .env` filled in — see the comments in that file.
 
 ---
 

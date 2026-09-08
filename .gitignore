@@ -29,6 +29,12 @@ harness/.runs/
 # os
 .DS_Store
 
-# spike tooling (large binaries, reproducible from .envrc.sh instructions)
+# Solver toolchain and vendored libraries: large binaries and release tarballs.
+# Reproduced by ./scripts/bootstrap.sh, which pins every version and verifies
+# each binary by sha256 against the build that produced the published receipts.
+# ⚠️ This comment used to claim they were "reproducible from .envrc.sh
+# instructions". .envrc.sh contains two PATH lines and no instructions, so a
+# clone of this repository could not be built by anyone but its author -- on a
+# project whose headline claim is third-party recomputation.
 .tools/
 .venv-tools/

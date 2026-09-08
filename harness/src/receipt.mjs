@@ -134,6 +134,13 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
           // Verified per run by task.mjs, not asserted: hevm must REFUTE
           // task == original, or prepareTask throws and nothing is scored.
           mutation_refuted: run.mutation_refuted === true,
+          // ⚠️ mutation_refuted alone is an EXISTENCE claim: hevm needs one
+          // divergent input out of 2**256 to refute. R4 asks that a memorised
+          // answer become wrong, which is about measure, not existence -- a bare
+          // revert bolted onto the untouched body refutes identically and leaves
+          // the body correct everywhere else. This is the fraction, and the gate
+          // that enforces it is proof 2b in task.mjs.
+          mutation_strength: run.mutation_strength ?? null,
           proof_1_baseline_equals_task: run.proof_1 ?? null,
           proof_3_trivial_equals_task: run.proof_3 ?? null,
         }

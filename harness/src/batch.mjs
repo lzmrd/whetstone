@@ -15,6 +15,7 @@
 
 import { readFileSync } from 'node:fs';
 import { runAgent, INTERFACE } from './agent.mjs';
+import { createHash } from 'node:crypto';
 import { resolve } from './providers.mjs';
 import { buildReceipt, publishReceipt } from './receipt.mjs';
 import { loadManifest, prepareTask } from './task.mjs';
@@ -151,6 +152,8 @@ console.log(`  labels           ${[...new Set(ok.map((r) => r.label))].join(', '
 // ⚠️ The rule promised "CLI/JSON" and only the CLI existed. The registry event,
 // the subgraph, the web view and any third party recomputing a row all read
 // this, not the table above.
+const sha256 = (hex) => createHash('sha256').update(String(hex)).digest('hex');
+
 const REPO = fileURLToPath(new URL('../../', import.meta.url));
 const outDir = join(REPO, '.run', 'batches');
 mkdirSync(outDir, { recursive: true });
@@ -158,9 +161,17 @@ const outFile = join(outDir, `${Date.now()}-${spec.replace(/[/:]/g, '_')}.json`)
 writeFileSync(outFile, JSON.stringify({
   schema: 'whetstone/batch/v1',
   model: spec,
+  // ⚠️ `digest` is the identity; `mutation` is a human label and binds nothing.
+  // The control batch shipped a description of `* 128` / `/ 8` for a file that
+  // had already been rewritten to keep `<< 7` / `>> 3` -- the record named a
+  // mutation that never ran. Scenario.sol solved exactly this for the input
+  // vector and the lesson had not been carried across to the task.
   task: { id: manifest.id, kind: prepared.kind, path: manifest.task.path,
+          digest: sha256(prepared.task.runtime),
+          baseline_digest: sha256(prepared.baseline.runtime),
           mutation: manifest.mutation.description,
           proof_1: prepared.proof_1, proof_2: prepared.proof_2,
+          mutation_strength: prepared.mutation_strength,
           mutation_refuted: prepared.mutation_refuted },
   interface: { seeds: n, temperature: INTERFACE.temperature, max_rounds: INTERFACE.max_rounds,
                max_tokens: INTERFACE.max_tokens, prompt_hash: INTERFACE.prompt_hash },

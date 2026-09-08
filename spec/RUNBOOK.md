@@ -10,17 +10,25 @@ One page. No new concepts: everything is extracted from [WHETSTONE.md](WHETSTONE
 
 ## Fix before starting
 
+⚠️ **This table was written on day 0 and three of its rows were still describing a
+plan that day 1 replaced** — the wrong target, a gate that had since been cleared,
+and model ids that were never confirmed. On a page whose entire promise is
+*"readable at 3am without having to think"*, opening with a superseded target is
+the worst place in the repository for stale text. Corrected; the superseded values
+are kept struck through rather than deleted, because the reason for the change is
+the finding.
+
 | Item | Value | Status |
 |---|---|---|
-| Target function (OZ) | `Math.mulDiv(uint256,uint256,uint256)` — `internal pure`, `Math.sol:206` | ✅ verified |
-| Baseline source (solady) | `FixedPointMathLib.fullMulDiv(uint256,uint256,uint256)` — `internal pure`, line 460 | ✅ verified |
+| Target function (OZ) | **`Math.log256(uint256)`** — `internal pure`. ~~`Math.mulDiv`~~ was dropped on day 1: hevm returns `UNKNOWN` on it (solver OOM both unconditionally and on the guarded domain), so no label above `UNKNOWN` is reachable | ✅ **superseded target replaced** |
+| Baseline source (solady) | **`LibBit`-style branchless `log256`**, mutated by `M` — see `contracts/src/tasks/Baseline.sol`. ~~`FixedPointMathLib.fullMulDiv`~~ dropped with the target above | ✅ verified, proof 1 PASSES |
 | solc version | **`0.8.35`** — from OZ's own `foundry.toml`. solady's pragma is `^0.8.4`, compatible | ✅ set |
 | `evm_version` | **`osaka`** — OZ's own setting. ⚠️ see hevm note below | ✅ set, verify Monday |
 | `optimizer_runs` | **`200`**, `optimizer = true` — OZ's own setting | ✅ set |
 | Checker | hevm \| halmos | **decided Monday from the spike** |
 | Cost denomination | HBAR paid; USD shown at a **declared rate + date** | ✅ set |
-| Model source | ⚠️ **OpenCode Zen is BLOCKED** (GATE 0). Replaced by a provider **registry**: `harness/src/prices.json` holds base URL, key env var, price source and pinned prices per provider. Candidates: **Groq** (Llama, Qwen, Gemma, Mixtral) and **OpenRouter** (`:free` variants) — both open-weight-only and OpenAI-compatible, so no harness change beyond a key and transcribed prices | ⚠️ keys needed |
-| Models under test | 2 paid (e.g. `minimax-m3`, $0.30/$1.20 per 1M) + 1 free (e.g. `mimo-v2.5-free`) | 🔴 **confirm ids from your dashboard** |
+| Model source | ~~OpenCode Zen~~ was BLOCKED (GATE 0) and is replaced by a provider **registry**: `harness/src/prices.json` holds base URL, key env var, price source and pinned prices per provider. **Groq** and **OpenRouter** are wired and reachable | ✅ **GATE 0 cleared**, keys present |
+| Models under test | `groq/openai/gpt-oss-120b` is the model every published batch used. ⚠️ **R14**: reviewers are refused at `providers.mjs` `resolve()` | ✅ confirmed by running |
 | Total demo budget | **$3** at list price — estimate below shows ~$1.20 needed | ✅ set |
 
 **Budget estimate**: ~5k in / 2k out tokens per round × 10 rounds × n=5 seeds × 3 models × 2 functions ≈ 1.5M in + 0.6M out ≈ **$1.20** at MiniMax M3 rates. The Go weekly cap is ~$30 — ample margin.
@@ -194,6 +202,7 @@ Regenerate rather than edit.
 | `scored` / `skipped` | A patch that reverts on part of the domain would otherwise silently shrink the denominator and look efficient |
 | `guarantee.assumptions` | A **conditional** proof whose condition is not published is not a result. Where the wrapper restricts the domain — `d != 0`, "the 512-bit product fits" — the restriction is part of the claim |
 | `guarantee.mutation_refuted` | R4 requires `M` to be semantic. This records that hevm **refuted** `OZ_M ≡ OZ_f`. If it is false, a memorized answer is still correct and the anti-contamination defence is decoration |
+| `guarantee.mutation_strength` | ⚠️ **`mutation_refuted` alone is nearly vacuous.** Refutation needs ONE divergent input out of 2**256, so a bare `revert` in front of an untouched body satisfies it while leaving a memorised body correct everywhere else — the mutation `Task.sol` explicitly argues against. This is the fraction of the committed scenario the mutation actually moves: **769/769** for the mutation in use, **1/769** for that bare-revert variant, which proof 2b refuses |
 | `prompt_hash`, `max_rounds`, `temperature` | The agent interface is the independent variable; runs are not comparable |
 | `round` | A patch found on round 1 and one found on round 8 cost different amounts |
 | `status` | The leaderboard would fake a finality it does not have |
@@ -212,14 +221,23 @@ real defence, and it needs the inputs to be public.
 
 ```
 artifacts/<run_id>/
-  variant.sol         the mutated source the model was given
-  baseline.sol        the baseline it is measured against
-  patch.sol           what the model returned
-  wrapper.sol         the exact wrapper compiled
-  Scenario.sol        the fixture set (Solidity), identified by keccak256 of its input vector
-  prompt.txt          the fixed system prompt
-  result.txt          raw checker output, including any partial-exploration warning
+  variant.sol           the mutated source the model was given (comments stripped, as on the wire)
+  baseline.sol          the baseline it is measured against
+  original.sol          the unmutated original -- withheld from the MODEL, not from the reader
+  trivial.sol           the one-word floor
+  patch.sol             what the model returned
+  scenario.sol          the fixture set, identified by keccak256 of its input vector
+  prompt.txt            the fixed system prompt
+  receipt.json          the canonical record, as published to HCS
+  *.runtime.hex         what hevm compared and the instrument measured, for both sides
+  RECOMPUTE.md          the commands to check every claim above, without trusting us
 ```
+
+⚠️ **This directory was promised here for days and never produced.** Per-run output
+went to `.run/`, which is **gitignored**, so the inputs a third party needs to
+recompute a score existed on one laptop. A receipt commits to hashes; recomputation
+needs the things the hashes are of. Written by `harness/src/artifacts.mjs`, called
+from `run.mjs` before the receipt is published. Found by adversarial review.
 
 With those plus `toolchain`, a third party reproduces `gas.*` and the guarantee
 label without asking us for anything.

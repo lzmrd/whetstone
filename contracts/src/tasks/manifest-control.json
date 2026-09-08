@@ -16,7 +16,8 @@
     "contract": "Original"
   },
   "mutation": {
-    "description": "COSMETIC ONLY: renamed variables, an extracted helper, `* 128` for `<< 7`, `/ 8` for `>> 3`, a ternary for the branchless cast. No behavioural change.",
+    "description": "COSMETIC ONLY, COST-NEUTRAL: renamed variables and an extracted helper. Shifts are preserved exactly (`<< 7`, `>> 3`) and no arithmetic is substituted. No behavioural change and, by construction, no change in gas.",
+    "_retracted": "This field previously described `* 128` for `<< 7` and `/ 8` for `>> 3`. That WAS the first control, and it was confounded: mul/div cost more than the shifts, so the control had 2.8x the headroom of the semantic task and the comparison was invalid (Addendum 8, retracted). ControlTask.sol was rewritten cost-neutral; this description was not, and the stale text was copied verbatim into the machine-readable batch records. A name binds nothing -- the lesson the scenario digest already encodes, not yet applied to the task.",
     "author": "Claude (Claude Code)",
     "applied_to": [
       "task"

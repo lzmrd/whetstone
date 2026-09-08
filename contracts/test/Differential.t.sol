@@ -23,25 +23,71 @@ contract DifferentialTest is Test {
     bytes4 constant SEL = bytes4(keccak256("f(uint256)"));
     address constant TASK = address(uint160(uint256(keccak256("whetstone.task"))));
     address constant PATCH = address(uint160(uint256(keccak256("whetstone.patch"))));
+    address constant ORIGINAL = address(uint160(uint256(keccak256("whetstone.original"))));
 
     bool internal loaded;
+    bool internal hasOriginal;
 
     function setUp() public {
         string memory p = vm.envOr("TASK_HEX", string(""));
         if (bytes(p).length == 0) return;
         vm.etch(TASK, vm.parseBytes(string.concat("0x", vm.readFile(p))));
-        vm.etch(PATCH, vm.parseBytes(string.concat("0x", vm.readFile(vm.envString("PATCH_HEX")))));
+        string memory o = vm.envOr("ORIGINAL_HEX", string(""));
+        if (bytes(o).length != 0) {
+            vm.etch(ORIGINAL, vm.parseBytes(string.concat("0x", vm.readFile(o))));
+            hasOriginal = true;
+        }
+        string memory q = vm.envOr("PATCH_HEX", string(""));
+        if (bytes(q).length == 0) return;
+        vm.etch(PATCH, vm.parseBytes(string.concat("0x", vm.readFile(q))));
         loaded = true;
     }
 
     /// Both sides on one input, compared in full.
     function _agree(uint256 x) internal view returns (bool ok, bytes memory a, bytes memory b) {
+        return _agreeOn(TASK, PATCH, x);
+    }
+
+    function _agreeOn(address l, address r, uint256 x)
+        internal view returns (bool ok, bytes memory a, bytes memory b)
+    {
         bytes memory cd = abi.encodeWithSelector(SEL, x);
-        (bool okA, bytes memory retA) = TASK.staticcall(cd);
-        (bool okB, bytes memory retB) = PATCH.staticcall(cd);
+        (bool okA, bytes memory retA) = l.staticcall(cd);
+        (bool okB, bytes memory retB) = r.staticcall(cd);
         ok = (okA == okB) && (keccak256(retA) == keccak256(retB));
         a = retA;
         b = retB;
+    }
+
+    /// MUTATION STRENGTH — how much of the domain the mutation actually moved.
+    ///
+    /// ⚠️ Why this exists. R4 asks that `M` make a MEMORISED answer wrong. Proof 2
+    /// only asks hevm to refute `task == original`, which needs **one** divergent
+    /// input out of 2**256. A bare `revert` bolted in front of an untouched body
+    /// would satisfy it identically — and Task.sol rejects exactly that mutation
+    /// in its own comments, on the grounds that a memorised body stays correct
+    /// everywhere else. So the gate could not distinguish the mutation the project
+    /// chose from the one it argued against, while §4 claimed it turned R4 "from
+    /// an intention into a gate". That was an overclaim, found by adversarial
+    /// review.
+    ///
+    /// This measures the fraction instead: over the committed scenario, on how
+    /// many inputs does the mutated task actually disagree with the original?
+    /// The harness enforces the threshold, because the required direction inverts
+    /// with the kind of variant — a semantic task must move most of the domain, a
+    /// control must move none of it.
+    ///
+    /// It prints rather than asserts, for the same reason the gas test prints:
+    /// one number, parsed by whoever knows what it should be.
+    function test_mutation_strength() public view {
+        if (!hasOriginal) return;
+        uint256[] memory xs = Scenario.inputs();
+        uint256 diverged;
+        for (uint256 i = 0; i < xs.length; i++) {
+            (bool ok,,) = _agreeOn(TASK, ORIGINAL, xs[i]);
+            if (!ok) diverged++;
+        }
+        console.log("WHETSTONE_DIVERGENCE", diverged, xs.length);
     }
 
     /// GATE 1 — known behaviour: the committed scenario, every input, full buffer.

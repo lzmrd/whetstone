@@ -190,6 +190,30 @@ export async function runAgent({
   // The denominator, measured once per run against the same instrument the
   // patch will be measured with.
   const baselineGas = await measurePatch(taskBuild.path, baseline.path);
+
+  /**
+   * GATE 4 — `gas(solady_M) < gas(OZ_M)`. The RUNBOOK says "verify, do not
+   * assume", and it was neither: a non-positive denominator produced
+   * `relative_progress: null` and the run was scored and published anyway.
+   * A gate whose failure path is a null field is not a gate.
+   *
+   * ⚠️ Checked HERE, once, before a single token is bought — not per patch. It
+   * is a property of the task and its baseline, so a model cannot influence it
+   * and there is no reason to discover it after paying for inference.
+   *
+   * If it fails, `M` damaged the third-party efficiency anchor: the mutated
+   * "expert" implementation is no longer faster than the mutated reference, so
+   * there is no expert gap for a percentage to be a fraction of.
+   */
+  const denominator = baselineGas.v1_total - baselineGas.patch_total;
+  if (!(denominator > 0)) {
+    throw new Error(
+      `GATE 4 FAILED: the baseline does not beat the task (denominator ${denominator} gas over the ` +
+        `scenario). The mutation damaged the third-party efficiency anchor, so relative_progress ` +
+        `would be a fraction of a gap that does not exist. Do not score.`,
+    );
+  }
+
   // The floor: what a one-word edit recovers, measured once with the same instrument.
   const trivialGas = trivial ? await measurePatch(taskBuild.path, trivial.path) : null;
 
@@ -211,6 +235,7 @@ export async function runAgent({
     seed,
     task_id: prepared.manifest.id,
     mutation_refuted: prepared.mutation_refuted,
+    mutation_strength: prepared.mutation_strength,
     baseline_total: baselineGas.patch_total,
     trivial_total: trivialGas?.patch_total ?? null,
     trivial_saves_per_call: trivialGas?.saved_per_call ?? null,
@@ -306,9 +331,9 @@ export async function runAgent({
           const gas = await measurePatch(taskBuild.path, built.path);
           // ⚠️ Above 100% is expected and legitimate: the patch beat the
           // baseline, it did not violate a limit. The baseline is not a ceiling.
-          const denom = gas.v1_total - baselineGas.patch_total;
+          // Established at GATE 4 above, before any inference was bought.
           gas.baseline_total = baselineGas.patch_total;
-          gas.relative_progress = denom > 0 ? Number((gas.saved_total / denom).toFixed(4)) : null;
+          gas.relative_progress = Number((gas.saved_total / denominator).toFixed(4));
           // ⚠️ The number that says whether anything was understood.
           gas.trivial_saves_per_call = trivialGas?.saved_per_call ?? null;
           gas.beats_trivial_by = trivialGas ? gas.saved_per_call - trivialGas.saved_per_call : null;
@@ -345,9 +370,8 @@ export async function runAgent({
             log(round, 'fuzzed', `${campaign.runs} runs, seed ${campaign.seed}, no divergence`);
             run.rounds.push({ round, outcome: 'fuzzed', label: 'FUZZED' });
             const gas = await measurePatch(taskBuild.path, built.path);
-            const denom = gas.v1_total - baselineGas.patch_total;
             gas.baseline_total = baselineGas.patch_total;
-            gas.relative_progress = denom > 0 ? Number((gas.saved_total / denom).toFixed(4)) : null;
+            gas.relative_progress = Number((gas.saved_total / denominator).toFixed(4));
             run.gas = gas;
             run.fuzz_campaign = campaign;
             run.patch = { source: got.source, runtime: built.runtime, path: built.path, label: 'FUZZED' };
