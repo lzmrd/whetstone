@@ -16,9 +16,11 @@ because a five-seed batch costs $0.003–0.012 in list-price terms against a $0.
 > its three proof obligations are enforced before any run is scored, so receipts
 > now carry `mutation_refuted: true`. A cosmetic control task has been run against
 > it and the result is **a tie** — reported as one.
-> ⚠️ Still missing: the `RunRegistry` on Base Sepolia and the subgraph, and with
-> them the allocator. Until those exist, the architecture diagram below describes
-> a design, not a running system.
+> The `RunRegistry` is deployed on Base Sepolia, the subgraph is published and
+> indexing, and the allocator decides the next paid round from indexed data. The
+> cross-chain link is checkable by anyone: take `receiptHash` from the subgraph,
+> fetch that message from Hedera's public mirror node, hash it, compare.
+> ⚠️ Still missing: the demo video and Start Fresh registration.
 > Built for [ETHOnline 2026](https://ethglobal.com/events/ethonline2026), Start Fresh track. Solo builder.
 
 ---
@@ -126,7 +128,7 @@ Three environments, each with a distinct and non-overlapping role.
 |---|---|
 | **Pinned Foundry EVM** (local) | Gas and equivalence. **Sole authority over the score** |
 | **Hedera testnet** | x402 payments and HCS receipts |
-| **Base Sepolia** | `RunRegistry` + the indexable subgraph |
+| **Base Sepolia** | [`RunRegistry`](https://sepolia.basescan.org/address/0x6Cc049953C21e0f23AD4a2AE791253Bb4fe18Fc0) `0x6Cc049953C21e0f23AD4a2AE791253Bb4fe18Fc0` + the [subgraph](https://thegraph.com/studio/subgraph/whetstone) |
 
 **Why three?** The Graph cannot index Hedera, and HCS is not EVM. So the canonical receipt lives on HCS, and a small event on Base Sepolia carries its hash, its HCS pointer, and the few fields the allocator filters on. Given the event you can fetch the HCS message from the mirror node and check the hashes match.
 
@@ -166,6 +168,7 @@ Every model call is paid for on-chain, per call, before the response is used.
 
 ```bash
 ./scripts/bootstrap.sh   # pinned libraries + solc, hevm, bitwuzla, z3 (~60 MB)
+cd harness && npm i && npm run web   # the leaderboard, reading the live subgraph
 source .envrc.sh         # .tools and Foundry ahead of the system PATH
 forge test               # 7 tests: instrument controls, gates, gas scenario
 ./scripts/selfcheck.sh   # the gate self-check, in both directions

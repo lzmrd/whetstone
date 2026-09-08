@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Whetstone — gas saved, and what backs it</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#F1F2EF; --panel:#E8EAE5; --ink:#15181A; --rule:#6C7370;
+  --faint:#C9CDC6; --gain:#1E6F5C; --loss:#A33A22; --link:#1E4F6F;
+}
+@media (prefers-color-scheme:dark){
+  :root{--ground:#131614; --panel:#1B1F1C; --ink:#E8EAE5; --rule:#8A918C;
+        --faint:#333833; --gain:#5FBFA3; --loss:#E08060; --link:#7FB6D6;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+     font-family:Archivo,system-ui,sans-serif;font-size:15px;line-height:1.5;
+     font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 5rem}
+a{color:var(--link)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+code,.hex{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.82em}
+
+/* ── masthead ─────────────────────────────────────────────── */
+.top{display:flex;flex-wrap:wrap;gap:1rem;align-items:baseline;
+     justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:.75rem}
+h1{font-size:2rem;font-weight:700;letter-spacing:-.02em;margin:0}
+.sub{margin:.6rem 0 0;max-width:62ch;color:var(--rule)}
+.live{font-size:.82rem;color:var(--rule);text-align:right}
+.live b{color:var(--ink);font-weight:600}
+
+h2{font-size:1.05rem;font-weight:600;margin:2.75rem 0 .25rem}
+h2+p{margin:.15rem 0 1.1rem;color:var(--rule);max-width:64ch}
+
+/* ── the floor plot: the datum this project is built around ── */
+.plot{position:relative;margin:1.5rem 0 0;padding:0 0 0 5.5rem}
+.band{position:relative;height:var(--h)}
+.mark{position:absolute;left:0;right:0;display:flex;align-items:center;gap:.6rem;
+      transform:translateY(-50%);white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--gain);flex:none}
+.mark.neg .dot{background:var(--loss)}
+.mark .val{font-weight:600;min-width:3.6rem;text-align:right;
+           position:absolute;left:-5.5rem}
+.mark.neg .val{color:var(--loss)}
+.mark .who{font-size:.88rem}
+.mark .note{color:var(--rule);font-size:.8rem}
+/* the one heavy line on the page */
+.datum{position:absolute;left:0;right:0;border-top:2.5px solid var(--ink);
+       transform:translateY(-50%)}
+.datum .cap{position:absolute;right:0;top:-1.35rem;font-size:.8rem;font-weight:600}
+.datum .val{position:absolute;left:-5.5rem;top:-.72rem;font-weight:700;
+            min-width:3.6rem;text-align:right}
+.zero{position:absolute;left:0;right:0;border-top:1px dashed var(--faint);
+      transform:translateY(-50%)}
+.zero .cap{position:absolute;right:0;top:-1.3rem;font-size:.8rem;color:var(--rule)}
+.zero .val{position:absolute;left:-5.5rem;top:-.7rem;color:var(--rule);
+           min-width:3.6rem;text-align:right}
+
+/* ── tables ───────────────────────────────────────────────── */
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:640px}
+th{text-align:left;font-weight:600;padding:.45rem .7rem .45rem 0;
+   border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:.5rem .7rem .5rem 0;border-bottom:1px solid var(--faint);vertical-align:top}
+th.n,td.n{text-align:right}
+tr.benched td{color:var(--rule)}
+.gain{color:var(--gain);font-weight:600}
+.loss{color:var(--loss);font-weight:600}
+.tag{display:inline-block;border:1px solid var(--rule);padding:.03rem .35rem;
+     font-size:.76rem;border-radius:2px}
+.tag.no{border-color:var(--loss);color:var(--loss)}
+
+/* ── the limits, on the page rather than under it ─────────── */
+.limits{margin-top:3rem;border-top:2px solid var(--ink);padding-top:1rem}
+.limits h2{margin-top:.5rem}
+.limits li{max-width:70ch;margin-bottom:.55rem}
+.state{padding:1rem 0;color:var(--rule)}
+.err{color:var(--loss);max-width:70ch}
+@media (max-width:620px){
+  .plot{padding-left:4.2rem}
+  .mark .val,.datum .val,.zero .val{left:-4.2rem;min-width:3rem}
+}
+@media (prefers-reduced-motion:no-preference){
+  .mark{animation:in .45s ease-out both}
+  @keyframes in{from{opacity:0;transform:translateY(-50%) translateX(-6px)}}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Whetstone</h1>
+      <p class="sub">Open-weight models optimising Solidity for gas, scored against a fixed
+      769-input scenario, with the strength of the correctness check reported beside every
+      number.</p>
+    </div>
+    <div class="live" id="live">connecting to the subgraph…</div>
+  </header>
+
+  <h2>Read against a one-word edit</h2>
+  <p>The floor is what an <code>unchecked</code> block recovers with no understanding of the
+  code at all. A patch below that line saved gas without having learned anything; a patch
+  below zero costs more than the code it replaced.</p>
+  <div id="plot" class="state">loading runs…</div>
+
+  <h2>Per model</h2>
+  <p>What the allocator reads. Spend includes attempts that returned nothing usable, because
+  money burned is still money burned.</p>
+  <div class="scroll"><table id="models"><tbody><tr><td class="state">loading…</td></tr></tbody></table></div>
+
+  <h2>Every run, and how to check it</h2>
+  <p>Each row links to its canonical receipt on Hedera and to the Base Sepolia transaction
+  that indexed it. The hashes are the same on both sides.</p>
+  <div class="scroll"><table id="runs"><tbody><tr><td class="state">loading…</td></tr></tbody></table></div>
+
+  <section class="limits">
+    <h2>What these numbers do not say</h2>
+    <ul>
+      <li><b>This is not a ranking of models.</b> One function and a handful of runs. Ties are
+      the normal outcome here and are reported as ties.</li>
+      <li><b>Percentage of baseline is measured against a 2024 implementation.</b> Patches that
+      beat it mostly reach for <code>clz</code>, an opcode the baseline predates, so the figure
+      says as much about EVM versions as about models. The absolute gas column and the floor
+      comparison do not involve the baseline and are unaffected.</li>
+      <li><b>A guarantee label is not a proof of usefulness.</b> It says how thoroughly the patch
+      was checked for equivalence, nothing about whether the saving matters downstream.</li>
+      <li><b>The floor is 69 gas per call for this task</b>, established by proving the one-word
+      edit equivalent to the task. It is a property of this function, not a constant.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const URL_ = "https://api.studio.thegraph.com/query/115254/whetstone/v0.0.2";
+// The floor comes from proof 3 in the receipt, not from the registry event, so it
+// is stated here rather than read. Task-specific: log256-bytelen/v1.
+const FLOOR = 69;
+
+const Q = `{
+  _meta { block { number } hasIndexingErrors }
+  models(orderBy: attemptCount, orderDirection: desc, first: 50) {
+    name runCount attemptCount failedCount consecutiveFailures
+    totalSavedTotal sumUsdListNano formalCount fuzzedCount unknownCount
+    consecutiveUnknown lastLabel
+  }
+  runs(orderBy: blockNumber, orderDirection: desc, first: 100) {
+    id runId model { name } scored outcome label savedPerCall maxRegression
+    relativeProgressE4 usdListNano hcsTopicId hcsSequence receiptHash blockNumber
+  }
+}`;
+
+const usd = (nano) => "$" + (Number(nano) / 1e9).toFixed(6);
+const short = (h) => h.slice(0, 10) + "…";
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function plot(runs) {
+  const scored = runs.filter((r) => r.scored).map((r) => ({ ...r, v: Number(r.savedPerCall) }));
+  if (!scored.length) return `<p class="state">No scored runs indexed yet.</p>`;
+
+  const vals = scored.map((r) => r.v).concat([0, FLOOR]);
+  const hi = Math.max(...vals), lo = Math.min(...vals);
+  const pad = Math.max(20, (hi - lo) * 0.12);
+  const top = hi + pad, bot = lo - pad;
+  const H = Math.max(260, scored.length * 42);
+  const y = (v) => ((top - v) / (top - bot)) * 100;
+
+  const marks = scored.map((r) => `
+    <div class="mark ${r.v < 0 ? "neg" : ""}" style="top:${y(r.v).toFixed(2)}%">
+      <span class="val">${r.v > 0 ? "+" : ""}${r.v}</span>
+      <span class="dot"></span>
+      <span class="who">${esc(r.model.name.split("/").pop())}</span>
+      <span class="note">${esc(r.label.replace(/_/g, " ").toLowerCase())}${
+        Number(r.maxRegression) > 0 ? ` · worst input +${r.maxRegression} gas` : ""}</span>
+    </div>`).join("");
+
+  return `<div class="plot"><div class="band" style="--h:${H}px">
+    ${marks}
+    <div class="datum" style="top:${y(FLOOR).toFixed(2)}%">
+      <span class="val">+${FLOOR}</span><span class="cap">one-word edit</span></div>
+    <div class="zero" style="top:${y(0).toFixed(2)}%">
+      <span class="val">0</span><span class="cap">no change</span></div>
+  </div></div>`;
+}
+
+function models(ms) {
+  const rows = ms.map((m) => {
+    const benched = Number(m.consecutiveFailures) >= 2 || Number(m.consecutiveUnknown) >= 2;
+    const perDollar = Number(m.sumUsdListNano) > 0
+      ? Math.round(Number(m.totalSavedTotal) / (Number(m.sumUsdListNano) / 1e9)).toLocaleString()
+      : "—";
+    return `<tr class="${benched ? "benched" : ""}">
+      <td>${esc(m.name)}</td>
+      <td class="n">${m.runCount} of ${m.attemptCount}</td>
+      <td class="n ${Number(m.totalSavedTotal) < 0 ? "loss" : Number(m.totalSavedTotal) > 0 ? "gain" : ""}">${Number(m.totalSavedTotal).toLocaleString()}</td>
+      <td class="n">${usd(m.sumUsdListNano)}</td>
+      <td class="n">${perDollar}</td>
+      <td>${m.formalCount} proved · ${m.fuzzedCount} fuzzed · ${m.unknownCount} undecided</td>
+      <td>${benched
+        ? `<span class="tag no">set aside</span>`
+        : `<span class="tag">in rotation</span>`}</td>
+    </tr>`;
+  }).join("");
+  return `<thead><tr>
+      <th>Model</th><th class="n">Scored</th><th class="n">Gas saved</th>
+      <th class="n">Spent</th><th class="n">Gas per dollar</th>
+      <th>Guarantees</th><th>Allocator</th>
+    </tr></thead><tbody>${rows}</tbody>`;
+}
+
+function runs(rs) {
+  const rows = rs.map((r) => {
+    const v = Number(r.savedPerCall);
+    const mirror = `https://testnet.mirrornode.hedera.com/api/v1/topics/${r.hcsTopicId}/messages/${r.hcsSequence}`;
+    return `<tr>
+      <td class="hex">${esc(r.runId)}</td>
+      <td>${esc(r.model.name.split("/").pop())}</td>
+      <td class="n">${r.scored ? `<span class="${v < 0 ? "loss" : "gain"}">${v > 0 ? "+" : ""}${v}</span>` : "—"}</td>
+      <td class="n">${r.scored ? (Number(r.maxRegression) || "0") : "—"}</td>
+      <td>${r.scored
+        ? esc(r.label.replace(/_/g, " ").toLowerCase())
+        : `<span class="tag no">no patch</span> ${esc(r.outcome.replace(/_/g, " "))}`}</td>
+      <td class="n">${usd(r.usdListNano)}</td>
+      <td>${r.scored
+        ? `<a href="${mirror}" rel="noopener">receipt ${r.hcsSequence}</a>`
+        : "—"}</td>
+      <td><a href="https://sepolia.basescan.org/tx/${r.id.slice(0, 66)}" rel="noopener">${esc(short(r.id))}</a></td>
+      <td class="hex">${r.scored ? esc(short(r.receiptHash)) : "—"}</td>
+    </tr>`;
+  }).join("");
+  return `<thead><tr>
+      <th>Run</th><th>Model</th><th class="n">Gas per call</th><th class="n">Worst input</th>
+      <th>Guarantee</th><th class="n">Cost</th><th>Canonical record</th>
+      <th>Indexed by</th><th>Content hash</th>
+    </tr></thead><tbody>${rows}</tbody>`;
+}
+
+(async () => {
+  const live = document.getElementById("live");
+  try {
+    const res = await fetch(URL_, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query: Q }),
+    });
+    if (!res.ok) throw new Error("subgraph returned HTTP " + res.status);
+    const body = await res.json();
+    if (body.errors) throw new Error(body.errors.map((e) => e.message).join("; "));
+    const d = body.data;
+
+    live.innerHTML = `indexed to block <b>${Number(d._meta.block.number).toLocaleString()}</b>
+      on Base Sepolia<br>${d._meta.hasIndexingErrors
+        ? `<span class="loss">indexing errors present</span>`
+        : "no indexing errors"}`;
+    document.getElementById("plot").outerHTML = `<div id="plot">${plot(d.runs)}</div>`;
+    document.getElementById("models").innerHTML = models(d.models);
+    document.getElementById("runs").innerHTML = runs(d.runs);
+  } catch (e) {
+    live.innerHTML = `<span class="loss">subgraph unreachable</span>`;
+    for (const id of ["plot", "models", "runs"]) {
+      document.getElementById(id).innerHTML =
+        `<p class="err">Could not read the subgraph: ${esc(e.message)}.
+         Nothing is shown rather than something stale — a leaderboard that keeps
+         displaying old numbers when its source is gone is worse than an empty one.</p>`;
+    }
+  }
+})();
+</script>
+</body>
+</html>

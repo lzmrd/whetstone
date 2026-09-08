@@ -74,11 +74,11 @@ A tick with no reference beside it is a claim about intent and is marked as such
 | R4 | Mutation semantic, never cosmetic | ✅ | `task.mjs` proof 2 **and proof 2b** (≥50% of the scenario; measured 769/769). Negative control `manifest-negative.json` is refused at 1/769 |
 | R5 | Median and dispersion | ⚠️ **implemented, not respected** | `batch.mjs` computes both. But n≥5 is declared and **4 of 7 batches ran n=2 or n=3**. The statistic is right; the sample discipline was not kept |
 | R6 | Leaderboard CLI **/ JSON** | ✅ | `.run/batches/*.json`, now with task digests |
-| R7 | Day 3 is The Graph | ❌ **not started — the largest remaining block** | — |
+| R7 | Day 3 is The Graph | ✅ **live** | `RunRegistry` [`0x6Cc04995…`](https://sepolia.basescan.org/address/0x6Cc049953C21e0f23AD4a2AE791253Bb4fe18Fc0) on Base Sepolia, subgraph `whetstone/v0.0.2` on Studio, indexing with no errors |
 | R8 | Demo video | ❌ Thursday | — |
 | R9 | Commit early and often | ✅ | 38+ commits |
-| R10 | Deterministic allocator | ❌ **not built** — needed by *both* remaining prizes | — |
-| R11 | HCS first, then Base Sepolia | ⚠️ HCS ✅, Base Sepolia ❌ | `hcs.mjs` |
+| R10 | Deterministic allocator | ✅ | `allocator.mjs`, pure `decide()` with 13 tests. Ranks on gas per nanodollar with integer arithmetic; benches on 2 consecutive `UNKNOWN` or 2 consecutive failed attempts |
+| R11 | HCS first, then Base Sepolia | ✅ both | `hcs.mjs`, `registry.mjs`. The registry write happens **after** the HCS publish — the row is a pointer, and a pointer written first points at nothing |
 | R12 | Self-check gates every run | ✅ | `batch.mjs` and `run.mjs` both refuse to start |
 | R13 | Checker version is part of the claim | ✅ | `selfcheck.sh` prints it; `bootstrap.sh` pins it by sha256 |
 | R14 | Red-team pool disjoint | ✅ **now actually enforced** | `providers.mjs` `resolve()` throws — previously a smoke test only |
@@ -107,7 +107,7 @@ mid-week.
 | HCS receipt per run | ✅ topic `0.0.10408009`, read back and hash-checked |
 | Video showing the paid request | ❌ Thursday |
 
-| The Graph | ❌ **none of it** — registry, subgraph, allocator, Start Fresh |
+| The Graph | ✅ registry, subgraph, allocator. ⚠️ Start Fresh registration still to do (Friday) |
 | Uniswap | ❌ conditional, not started |
 
 ---
@@ -154,7 +154,34 @@ unaffected.
 
 # Remaining plan
 
-## Wednesday 9 — The Graph, the whole day (R7)
+## ✅ Wednesday 9 — The Graph — DONE (a day early)
+
+Deployed, indexing, and driving decisions from indexed data rather than a mock.
+The cross-chain link was **executed** rather than asserted: take `receiptHash`
+from the subgraph, fetch the HCS message from the public mirror node, reassemble
+its chunks, sha256 it — matches.
+
+⚠️ **Two defects that only running it could find**, both recorded because they
+say something about the method:
+
+1. **A paid attempt that produced no patch was recorded nowhere.** A model that
+   always fails earned no row, stayed permanently "unexplored", and the allocator
+   re-elected it every round while its spend stayed invisible to the one component
+   whose job is budgeting. Fixed with `scored` + `outcome` on a **separate axis**
+   from the guarantee label, so §7's vocabulary stays closed at four rather than
+   growing a fifth value for "no patch". Required a redeploy.
+2. **An edit to the allocator's GraphQL query silently did not apply.**
+   `consecutiveFailures` was missing from every response, `Number(undefined)` is
+   `NaN`, `NaN >= 2` is false — so the bench rule was **dead code for an
+   afternoon while its unit tests passed**, because they build rows by hand and
+   hand-built rows have the field. Only the live subgraph could contradict the
+   query. `assertComplete()` now checks the response against the fields the
+   policy reads.
+
+The second one is the more instructive: it is the "a gate nothing calls is not a
+gate" failure in a new costume — a *rule nothing can trigger*.
+
+## ~~Wednesday 9 — The Graph, the whole day (R7)~~ — superseded, kept for the record
 
 1. **`RunRegistry`** on Base Sepolia: one event per run — content hash, HCS topic
    and sequence, and the few fields the allocator filters on. A **pointer, not a
@@ -164,6 +191,24 @@ unaffected.
    needs it as the consumer, Hedera needs "an agent that budgets across providers".
 4. **The fallback path** — same allocator, subgraph disabled, blind round-robin.
    It exists only to be filmed, and it is demo beat 3.
+
+## ✅ Web view — DONE
+
+`web/index.html`, served by `npm run web`. It queries the subgraph **from the
+browser**, so there is no backend between the index and the screen: a judge who
+distrusts the page can run the same query against the same public endpoint.
+
+⚠️ The hero is not a savings number. It is the **trivial floor drawn as a datum
+line**, with every run placed above or below it — because "did the model beat a
+one-word `unchecked` edit?" is the question a percentage cannot answer, and it is
+the one thing on the page no other leaderboard has. Regressions render at the
+same weight as wins, and the section titled *What these numbers do not say*
+carries [D-15](DECISIONS.md) rather than hiding it.
+
+Two defects caught by screenshotting it rather than reading it: the floor's value
+label collided with its caption, and the page promised a link to the Base Sepolia
+transaction while rendering only the Hedera one. The transaction was already in
+`Run.id` — it was simply never queried.
 
 ## Thursday 10 — freeze and record
 
