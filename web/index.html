@@ -1,4 +1,27 @@
 <!doctype html>
+<!--
+  Whetstone leaderboard.
+
+  ⚠️ WRITTEN FOR A SPECIFIC READER, and that calibration drives most of the
+  choices here: strong on blockchain, comfortable with AI, new to benchmarks.
+
+  So the page leans on what that reader already knows — Solidity, gas, on-chain
+  hashes — and explains what they do not:
+
+    · it opens with the ACTUAL FUNCTION and an actual patch, because someone who
+      reads Solidity learns more from eight lines of code than from a paragraph
+      about methodology;
+    · it is structured as two questions ("does it still do the same thing", "was
+      the saving worth anything") rather than as a leaderboard, because the
+      questions are the part a benchmark-naive reader is missing;
+    · guarantee labels appear in plain language with the raw label beside them,
+      so the page and the receipts still agree;
+    · verification is written as an instruction the reader can carry out, not as
+      a property the page claims about itself.
+
+  It queries the subgraph from the browser. There is no backend that could
+  reshape the numbers between the index and the screen.
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -61,6 +84,26 @@ h2+p{margin:.15rem 0 1.1rem;color:var(--rule);max-width:64ch}
            min-width:3.6rem;text-align:right}
 
 /* ── tables ───────────────────────────────────────────────── */
+/* code is the fastest way to explain this to someone who reads Solidity */
+pre{margin:0;padding:.85rem 1rem;background:var(--panel);overflow-x:auto;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.78rem;line-height:1.65;
+    border-left:2px solid var(--rule)}
+pre b{font-weight:500;color:var(--gain)}
+pre i{font-style:normal;color:var(--rule)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-top:1rem}
+.two h3{font-size:.9rem;font-weight:600;margin:0 0 .4rem}
+.two p{margin:.5rem 0 0;font-size:.84rem;color:var(--rule)}
+@media (max-width:760px){.two{grid-template-columns:1fr}}
+
+/* the plain-language key to our own jargon */
+.key{margin:1rem 0 0;border-left:2px solid var(--rule);padding-left:1rem}
+.key div{margin-bottom:.7rem;max-width:66ch}
+.key b{font-weight:600}
+.lab{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--rule);
+     white-space:nowrap}
+
+.ask{margin:2.75rem 0 .25rem;font-size:1.25rem;font-weight:700;letter-spacing:-.01em}
+.ask+p{margin:.35rem 0 1.1rem;max-width:64ch}
 .scroll{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:640px}
 th{text-align:left;font-weight:600;padding:.45rem .7rem .45rem 0;
@@ -96,27 +139,91 @@ tr.benched td{color:var(--rule)}
   <header class="top">
     <div>
       <h1>Whetstone</h1>
-      <p class="sub">Open-weight models optimising Solidity for gas, scored against a fixed
-      769-input scenario, with the strength of the correctness check reported beside every
-      number.</p>
+      <p class="sub">Open-weight models are paid, per call, to make a Solidity function
+      cheaper to run. Two questions decide whether the result means anything: <b>does the
+      rewritten function still do the same thing</b>, and <b>was the saving worth more than a
+      one-word edit</b>. Both are answered here, per run, with receipts on two chains.</p>
     </div>
     <div class="live" id="live">connecting to the subgraph…</div>
   </header>
 
-  <h2>Read against a one-word edit</h2>
-  <p>The floor is what an <code>unchecked</code> block recovers with no understanding of the
-  code at all. A patch below that line saved gas without having learned anything; a patch
-  below zero costs more than the code it replaced.</p>
+  <h2 class="ask">The job</h2>
+  <p>Each model is handed one <code>pure</code> Solidity function and asked to make it cost
+  less gas. It is told the compiler settings and the exact inputs it will be measured on. It is
+  not told where the function came from.</p>
+
+  <div class="two">
+    <div>
+      <h3>What the model receives</h3>
+<pre>function f(uint256 x) external pure returns (uint256 r) {
+    <i>if (x == 0) revert ZeroHasNoBytes();</i>
+    r = (x > 0xffffffff...ffff ? 1 : 0) &lt;&lt; 7;
+    r |= ((x >> r) > 0xffffffffffffffff ? 1 : 0) &lt;&lt; 6;
+    r |= ((x >> r) > 0xffffffff ? 1 : 0) &lt;&lt; 5;
+    r |= ((x >> r) > 0xffff ? 1 : 0) &lt;&lt; 4;
+    return ((r >> 3) | ((x >> r) > 0xff ? 1 : 0)) + 1;
+}</pre>
+      <p>How many bytes are needed to hold <code>x</code>. It is a mutated copy of a
+      well-known library function: the mutation makes the memorised answer <b>wrong</b>, so a
+      model that recites from training data fails the equivalence check rather than scoring.</p>
+    </div>
+    <div>
+      <h3>What one model returned</h3>
+<pre>function f(uint256 x) external pure returns (uint256 r) {
+    <i>if (x == 0) revert ZeroHasNoBytes();</i>
+    uint256 lz;
+    assembly { <b>lz := clz(x)</b> }
+    r = (256 - lz + 7) / 8;
+}</pre>
+      <p>The whole shift chain replaced by one opcode. <b>206 gas per call</b> cheaper, and
+      proved to return the identical value for every one of the 2<sup>256</sup> possible
+      inputs.</p>
+    </div>
+  </div>
+
+  <h2 class="ask">Question 1 — does it still do the same thing?</h2>
+  <p>A patch that is faster and wrong is worthless, so nothing is scored until a symbolic
+  prover has compared the two contracts. Every row below carries how strong that check was:</p>
+
+  <div class="key">
+    <div><b>Proved for every input.</b> A solver explored the whole input space and found no
+    difference in the returned value, in whether the call reverts, or in the revert data.
+    This is not testing — no input was sampled, the claim is universal.
+    <span class="lab">FORMAL_NO_EXPLICIT_INPUT_BOUND</span></div>
+    <div><b>Fuzzed, not proved.</b> The prover did not finish, so the patch was compared
+    against the original over 20 000 pseudo-random inputs with a pinned seed. Evidence, not a
+    guarantee. <span class="lab">FUZZED</span></div>
+    <div><b>Undecided.</b> The solver ran out of memory or time. ⚠️ Not a pass — an unfinished
+    search is not evidence of anything. <span class="lab">UNKNOWN</span></div>
+    <div><b>No patch.</b> The model never returned something that compiled and passed the
+    gates. The call was still paid for, so the attempt is recorded with its cost.</div>
+  </div>
+
+  <h2 class="ask">Question 2 — was the saving worth anything?</h2>
+  <p>Wrapping the last line in <code>unchecked</code> removes an overflow check the compiler
+  cannot prove unreachable. That single word saves <b>69 gas per call</b> and requires
+  understanding nothing about what the function does. It is the line every result is read
+  against — a patch below it beat nothing but the compiler's caution.</p>
+  <p style="font-size:.84rem">Vertical axis: gas saved per call, against the code the model was given.</p>
   <div id="plot" class="state">loading runs…</div>
 
-  <h2>Per model</h2>
-  <p>What the allocator reads. Spend includes attempts that returned nothing usable, because
-  money burned is still money burned.</p>
+  <h2 class="ask">Who gets the next paid call?</h2>
+  <p>Every model call is bought on Hedera before the answer is used, so choosing the next one
+  is a spending decision. A fixed policy — not a model — reads the table below and picks: best
+  gas per dollar, unless the model has produced two undecided proofs or two failed attempts in
+  a row, in which case it is set aside. Spend counts attempts that returned nothing, because
+  money burned is money burned.</p>
   <div class="scroll"><table id="models"><tbody><tr><td class="state">loading…</td></tr></tbody></table></div>
 
-  <h2>Every run, and how to check it</h2>
-  <p>Each row links to its canonical receipt on Hedera and to the Base Sepolia transaction
-  that indexed it. The hashes are the same on both sides.</p>
+  <h2 class="ask">Check any row without trusting this page</h2>
+  <p>Each run writes a full receipt to Hedera Consensus Service and a pointer to it on Base
+  Sepolia, which is what this subgraph indexes. <b>Content hash</b> is the sha256 of the HCS
+  message as recorded on Base Sepolia. Open the receipt, hash it yourself, and compare — if
+  they differ, one of the two chains is lying and you can prove which. Run ids link to the
+  Base Sepolia transaction that wrote the pointer.</p>
+  <p style="font-size:.84rem"><b>Worst single input</b> is the largest amount a patch made
+  <i>any one</i> input cost more. A patch can be cheaper on average and worse at a boundary,
+  so it is reported next to the saving and never on its own.</p>
   <div class="scroll"><table id="runs"><tbody><tr><td class="state">loading…</td></tr></tbody></table></div>
 
   <section class="limits">
@@ -155,6 +262,19 @@ const Q = `{
   }
 }`;
 
+/**
+ * ⚠️ The guarantee labels are the project's own vocabulary and mean nothing to a
+ * reader who has never built a benchmark. They are shown in plain language, with
+ * the raw label kept beside them so the page and the receipts still agree.
+ */
+const PLAIN = {
+  FORMAL_NO_EXPLICIT_INPUT_BOUND: "proved for every input",
+  FORMAL_BOUNDED: "proved, within a bound",
+  FUZZED: "fuzzed, not proved",
+  UNKNOWN: "undecided",
+};
+const plain = (l) => PLAIN[l] ?? l.replace(/_/g, " ").toLowerCase();
+
 const usd = (nano) => "$" + (Number(nano) / 1e9).toFixed(6);
 const short = (h) => h.slice(0, 10) + "…";
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
@@ -166,7 +286,7 @@ function plot(runs) {
 
   const vals = scored.map((r) => r.v).concat([0, FLOOR]);
   const hi = Math.max(...vals), lo = Math.min(...vals);
-  const pad = Math.max(20, (hi - lo) * 0.12);
+  const pad = Math.max(12, (hi - lo) * 0.08);
   const top = hi + pad, bot = lo - pad;
   const H = Math.max(260, scored.length * 42);
   const y = (v) => ((top - v) / (top - bot)) * 100;
@@ -176,7 +296,7 @@ function plot(runs) {
       <span class="val">${r.v > 0 ? "+" : ""}${r.v}</span>
       <span class="dot"></span>
       <span class="who">${esc(r.model.name.split("/").pop())}</span>
-      <span class="note">${esc(r.label.replace(/_/g, " ").toLowerCase())}${
+      <span class="note">${esc(plain(r.label))}${
         Number(r.maxRegression) > 0 ? ` · worst input +${r.maxRegression} gas` : ""}</span>
     </div>`).join("");
 
@@ -201,16 +321,16 @@ function models(ms) {
       <td class="n ${Number(m.totalSavedTotal) < 0 ? "loss" : Number(m.totalSavedTotal) > 0 ? "gain" : ""}">${Number(m.totalSavedTotal).toLocaleString()}</td>
       <td class="n">${usd(m.sumUsdListNano)}</td>
       <td class="n">${perDollar}</td>
-      <td>${m.formalCount} proved · ${m.fuzzedCount} fuzzed · ${m.unknownCount} undecided</td>
+      <td>${m.formalCount} proved, ${m.fuzzedCount} fuzzed, ${m.unknownCount} undecided</td>
       <td>${benched
         ? `<span class="tag no">set aside</span>`
-        : `<span class="tag">in rotation</span>`}</td>
+        : `<span class="tag">eligible</span>`}</td>
     </tr>`;
   }).join("");
   return `<thead><tr>
-      <th>Model</th><th class="n">Scored</th><th class="n">Gas saved</th>
+      <th>Model</th><th class="n">Valid patches</th><th class="n">Gas saved, total</th>
       <th class="n">Spent</th><th class="n">Gas per dollar</th>
-      <th>Guarantees</th><th>Allocator</th>
+      <th>Proof strength</th><th>Next call</th>
     </tr></thead><tbody>${rows}</tbody>`;
 }
 
@@ -219,25 +339,25 @@ function runs(rs) {
     const v = Number(r.savedPerCall);
     const mirror = `https://testnet.mirrornode.hedera.com/api/v1/topics/${r.hcsTopicId}/messages/${r.hcsSequence}`;
     return `<tr>
-      <td class="hex">${esc(r.runId)}</td>
+      <td class="hex"><a href="https://sepolia.basescan.org/tx/${r.id.slice(0, 66)}" rel="noopener">${esc(r.runId)}</a></td>
       <td>${esc(r.model.name.split("/").pop())}</td>
       <td class="n">${r.scored ? `<span class="${v < 0 ? "loss" : "gain"}">${v > 0 ? "+" : ""}${v}</span>` : "—"}</td>
-      <td class="n">${r.scored ? (Number(r.maxRegression) || "0") : "—"}</td>
+      <td class="n">${r.scored ? (Number(r.maxRegression) > 0 ? `+${r.maxRegression} gas` : "none") : "—"}</td>
       <td>${r.scored
-        ? esc(r.label.replace(/_/g, " ").toLowerCase())
+        ? `${esc(plain(r.label))} <span class="lab">${esc(r.label)}</span>`
         : `<span class="tag no">no patch</span> ${esc(r.outcome.replace(/_/g, " "))}`}</td>
       <td class="n">${usd(r.usdListNano)}</td>
       <td>${r.scored
         ? `<a href="${mirror}" rel="noopener">receipt ${r.hcsSequence}</a>`
         : "—"}</td>
-      <td><a href="https://sepolia.basescan.org/tx/${r.id.slice(0, 66)}" rel="noopener">${esc(short(r.id))}</a></td>
       <td class="hex">${r.scored ? esc(short(r.receiptHash)) : "—"}</td>
     </tr>`;
   }).join("");
   return `<thead><tr>
-      <th>Run</th><th>Model</th><th class="n">Gas per call</th><th class="n">Worst input</th>
-      <th>Guarantee</th><th class="n">Cost</th><th>Canonical record</th>
-      <th>Indexed by</th><th>Content hash</th>
+      <th>Run</th><th>Model</th><th class="n">Gas saved per call</th>
+      <th class="n">Worst single input</th>
+      <th>How it was checked</th><th class="n">Cost</th>
+      <th>Receipt, Hedera</th><th>Content hash</th>
     </tr></thead><tbody>${rows}</tbody>`;
 }
 
