@@ -14,7 +14,8 @@
     "prices:sync": "node --env-file=../.env src/sync-prices.mjs",
     "hcs:init": "node --env-file=../.env src/hcs-init.mjs",
     "gateway": "node --env-file=../.env ../gateway/server.mjs",
-    "batch": "node --env-file=../.env src/batch.mjs"
+    "batch": "node --env-file=../.env src/batch.mjs",
+    "clean": "rm -rf ../.run/c-*"
   },
   "dependencies": {
     "@hashgraph/sdk": "^2.81.0",

@@ -12,6 +12,34 @@ import { submitReceipt, verifyOnMirror, sha256 } from './hcs.mjs';
 import { TABLE, TABLE_HASH } from './providers.mjs';
 import { PINS } from './compile.mjs';
 import { checkerVersion, CHECKER } from './equivalence.mjs';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO = fileURLToPath(new URL('../../', import.meta.url));
+
+/**
+ * ⚠️ Provenance, and it was documented in the receipt schema for days without
+ * ever being emitted. The task and baseline sources are INLINED, so these are not
+ * build inputs — but they are the answer to "whose code is this baseline?", and
+ * the whole anti-circularity argument is that the efficient code is Vectorized's
+ * and only the mutation is ours. A claim about provenance with no version behind
+ * it is not checkable.
+ */
+function libVersion(name) {
+  const f = join(REPO, 'lib', name, '.pinned-version');
+  return existsSync(f) ? readFileSync(f, 'utf8').trim() : null;
+}
+
+/**
+ * ⚠️ Read from the source of truth, not retyped. A hardcoded "boundary/v1" here
+ * could drift from Scenario.sol while the digest changed underneath it, and the
+ * receipt would name one scenario while reporting another's identity.
+ */
+function scenarioName() {
+  const src = readFileSync(join(REPO, 'contracts/test/Scenario.sol'), 'utf8');
+  return src.match(/NAME\s*=\s*"([^"]+)"/)?.[1] ?? null;
+}
 
 const git = (args) => {
   try { return execFileSync('git', args, { encoding: 'utf8' }).trim(); }
@@ -36,7 +64,9 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
       variant_hash: sha256(taskSource),
       baseline_hash: run.baseline_hash ?? null,
       scenario_id: run.gas?.scenario_id ?? null,
-      scenario_name: 'boundary/v1',
+      // ⚠️ Read from the source of truth, not retyped. A hardcoded name here
+      // could drift from Scenario.sol while the digest kept changing underneath.
+      scenario_name: scenarioName(),
       prompt_hash: run.prompt_hash,
     },
 
@@ -117,6 +147,9 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
       checker: CHECKER.name,
       checker_version: await checkerVersion(),
       solver: CHECKER.solver,
+      oz_version: libVersion('openzeppelin-contracts'),
+      solady_version: libVersion('solady'),
+      forge_std_version: libVersion('forge-std'),
     },
 
     artifacts: {

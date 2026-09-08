@@ -1,45 +1,41 @@
 # Coherence audit — scope against implementation
 
-Checked against the code on **Monday 7 September**, not against memory. Every
-"✅" below was verified by running something or reading the file that implements
-it; every "❌" by failing to find one.
+Re-checked **Tuesday 8 September** by running things, not by reading them. The
+previous revision of this file listed three false claims; all three are now
+closed, and this rewrite exists because **the audit document itself had gone
+stale**, which is the same failure it was written to catch.
 
 ---
 
-## The three real incoherences
+## Closed since the last audit
 
-### 1. ⚠️ R12 is false as written
+| Was | Now |
+|---|---|
+| R12: self-check gated nothing — the script existed and nothing called it | ✅ `batch.mjs` **and** `run.mjs` refuse to start if it fails |
+| Gate 2 did not exist, so `FUZZED` was unreachable | ✅ `Differential.t.sol`, 20 000 pinned runs, wired into the loop |
+| R6 promised CLI **and JSON**; only CLI existed | ✅ `.run/batches/*.json` per batch |
+| `UNKNOWN` accepted a patch with **no** differential evidence | ✅ falls back to gates 1-2 → `FUZZED`, or refutes and feeds the counterexample back |
+| `npm run agent` was broken by an interface change | ✅ repaired, and now self-checks too |
+| "no unpaid path to the models" was false | ✅ true: a run without the gateway is refused, or marked `unpaid — NOT SCOREABLE` |
+| §12 claimed per-call metering; the gateway charged a flat fee | ✅ metered per request, breakdown in the 402 body |
+| `FUZZED` had nowhere to record its campaign | ✅ `guarantee.fuzz_campaign` |
+| A percentage could not say whether anything was understood | ✅ the **trivial floor**, guarded by proof 3 |
 
-> *"`scripts/selfcheck.sh` gates every measured run. A failing self-check means no
-> run is scored or published."*
+## Found and fixed in this pass
 
-**Nothing calls it.** `grep -rn selfcheck harness/ gateway/ contracts/` returns
-nothing. The script exists, passes, and is invoked only by hand.
-
-This is the exact failure this project keeps correcting elsewhere — a property
-established once and then assumed. The two things it guards (hevm still compares
-revert payloads; the gas instrument is order-neutral) are load-bearing for every
-number published so far.
-
-**Fix**: `prepareTask()` runs it, or `batch.mjs` refuses to start without it.
-
-### 2. ⚠️ Gate 2 does not exist, so `FUZZED` is unreachable
-
-§7 declares three gate levels and four labels. Level 2, differential fuzzing, was
-never implemented — there is no fuzz test in `contracts/`. So the vocabulary can
-print `FORMAL_*` and `UNKNOWN` and **nothing else**.
-
-The spec's own argument against a decorative vocabulary applies to itself here.
-
-**Consequence beyond the label**: `toHexString` — the highest-headroom target at
-**7 703 gas/call against `log256`'s 66** — is unusable. hevm does not terminate on
-it, so `FUZZED` is the only label it could earn, and we cannot award it.
-
-### 3. ⚠️ R6 promises CLI **and JSON**; only CLI exists
-
-`batch.mjs` prints a table and writes no machine-readable output. Everything
-downstream needs it: the registry event, the subgraph, the web view, and any
-third party recomputing a published row.
+- **`oz_version`, `solady_version`, `wrapper_hash`** were in the documented
+  receipt schema for days and **never emitted**. Provenance is the whole
+  anti-circularity argument — *the efficient code is Vectorized's, only the
+  mutation is ours* — and it had no version behind it. Now emitted from
+  `lib/*/.pinned-version`.
+- The receipt schema in the RUNBOOK had drifted in **both** directions: three
+  fields documented and unemitted, sixteen emitted and undocumented. It is now
+  **generated from `buildReceipt()`**, not maintained by hand.
+- `scenario_name` was a hardcoded string in the receipt builder. It could drift
+  from `Scenario.sol` while the digest changed underneath. Now read from source.
+- §5 said the model receives "the gas scenario (fixture set)". It receives a
+  precise *description*, not the 769 values. The description determines the set
+  exactly, so the spec now says that rather than implying the vector is sent.
 
 ---
 
@@ -47,110 +43,81 @@ third party recomputing a published row.
 
 | | Rule | Status |
 |---|---|---|
-| R1 | One mutated variant per function, fixed across seeds | ✅ `manifest.json` |
-| R2 | `M` hand-written, authorship a declared fact | ✅ declared — **model-written**, disclosed |
-| R3 | Mutated variant is the run's v1 reference | ✅ patch is proved against the task |
-| R4 | Mutation semantic, never cosmetic | ✅ **gated** — proof 2 must refute |
-| R5 | Median and dispersion, never a single value | ✅ `batch.mjs` |
-| R6 | Leaderboard = CLI **/ JSON** | ⚠️ **CLI only** |
-| R7 | Day 3 is The Graph | ❌ not started |
-| R8 | Demo video 2-4 min | ❌ Thursday |
-| R9 | Commit early and often | ✅ |
-| R10 | Deterministic allocator | ❌ **not built** |
+| R1 | One mutated variant per function, fixed across seeds | ✅ |
+| R2 | `M` authorship a declared fact | ✅ declared **model-written** |
+| R3 | Mutated variant is the run's v1 reference | ✅ |
+| R4 | Mutation semantic, never cosmetic | ✅ gated by proof 2 |
+| R5 | Median and dispersion | ✅ |
+| R6 | Leaderboard CLI **/ JSON** | ✅ |
+| R7 | Day 3 is The Graph | ❌ **not started — the largest remaining block** |
+| R8 | Demo video | ❌ Thursday |
+| R9 | Commit early and often | ✅ 37+ commits |
+| R10 | Deterministic allocator | ❌ **not built** — needed by *both* remaining prizes |
 | R11 | HCS first, then Base Sepolia | ⚠️ HCS ✅, Base Sepolia ❌ |
-| R12 | Self-check gates every run | ⚠️ **script exists, nothing calls it** |
-| R13 | Checker version is part of the claim | ✅ in every receipt |
-| R14 | Red-team pool disjoint from tested models | ✅ enforced, refuses to run |
+| R12 | Self-check gates every run | ✅ both entry points |
+| R13 | Checker version is part of the claim | ✅ |
+| R14 | Red-team pool disjoint | ✅ refuses to run on violation |
 
 ## Gates
 
 | | | Status |
 |---|---|---|
-| 1 | `forge test` — known behaviour | ⚠️ harness self-tests exist; **no per-task behaviour test** |
-| 2 | Differential fuzzing | ❌ **missing** — see above |
-| 3 | Symbolic equivalence | ✅ hevm, both directions, version pinned |
-| 4 | Falsification bounty | ❌ a policy for the README, not code |
+| 1 | Known behaviour over the committed scenario | ✅ full return buffer, not just success/failure |
+| 2 | Differential fuzzing | ✅ 20 000 runs, pinned seed, recorded in the receipt |
+| 3 | Symbolic equivalence | ✅ hevm 0.58.0, three proof obligations per task |
+| 4 | Falsification bounty | ❌ a README policy, not code |
 
 ## Partner prizes
 
 | Hedera | |
 |---|---|
-| x402-gated service on testnet via Blocky402 | ✅ `gateway/server.mjs` |
-| Agent completes a real paid request end to end | ✅ settled, tx recorded |
-| Our own gateway, pass-through pricing | ✅ |
+| x402-gated service, Blocky402 | ✅ |
+| Real paid request end to end | ✅ metered per call |
+| Own gateway, pass-through pricing | ✅ |
 | HCS receipt per run | ✅ topic `0.0.10408009`, read back and hash-checked |
-| Public repo | ✅ |
 | Video showing the paid request | ❌ Thursday |
-| README: setup + architecture + **payment flow** | ⚠️ present, needs a pass |
 
-| The Graph | |
-|---|---|
-| `RunRegistry` on Base Sepolia | ❌ |
-| Subgraph published to Studio | ❌ |
-| **Allocator queries the subgraph** | ❌ — the consumption that counts |
-| Start Fresh registration | ❌ builder action |
-
-| Uniswap | conditional on Thursday — ❌ not started |
-
-## Demo beats (§11)
-
-| | Beat | Filmable today? |
-|---|---|---|
-| 1 | The paid request executing | ✅ |
-| 2 | Gates running, **including a rejection** | ✅ — refuted rounds happen naturally |
-| 3 | Subgraph as the allocator's memory | ❌ **needs both missing pieces** |
-| 4 | Receipt verified from outside | ✅ mirror node in a browser |
-| 5 | Honest scope slide | ✅ material exists |
+| The Graph | ❌ **none of it** — registry, subgraph, allocator, Start Fresh |
+| Uniswap | ❌ conditional, not started |
 
 ---
 
-# Plan — ordered by dependency, not by preference
+## What is true about the results
 
-## Now — close what the spec already claims (≈2h)
+⚠️ The strongest-sounding result of Monday — *"99.9% on the cosmetic control
+against 13.9% on the semantic mutation"* — was **retracted** the same day. The
+control was confounded (2.8× the headroom) and the batch-to-batch variance at n=5
+is larger than the effect claimed. With a cost-neutral control the two are
+indistinguishable: 70.7% against 75.4%, overlapping ranges. See
+[Addendum 9](spike/DAY1-RESULTS.md).
 
-1. **Wire the self-check** so R12 stops being false. `batch.mjs` refuses to run if
-   it fails. *15 min.*
-2. **JSON output** from `batch.mjs`: one file per batch with every field the
-   registry, subgraph and web view will need. R6, and everything downstream
-   depends on it. *30 min.*
-3. **Gate 2 — differential fuzzing.** Compare task and patch on fuzzed inputs:
-   return bytes **and revert data**. Makes `FUZZED` awardable. *1h.*
-
-## Then — the second target (≈1h, unlocked by step 3)
-
-4. **`toHexString`** as a second task, earning `FUZZED` where `log256` earns
-   `FORMAL_*`. This is D-11's declared stretch, and it is the only way the
-   leaderboard shows **two different labels** — which is the whole argument for
-   having a vocabulary.
-
-## Wednesday — The Graph (R7), the largest remaining block
-
-5. **`RunRegistry`** on Base Sepolia: one event per run, carrying the content
-   hash, HCS topic and sequence, and the few fields the allocator filters on.
-   **A pointer, not a copy** (D-09).
-6. **Subgraph** indexing it, published to Studio.
-7. **The allocator** (R10): deterministic policy, queries the subgraph, prints
-   the decision beside the data it came from. ⚠️ Required by **both** remaining
-   prizes — The Graph needs the consumption, Hedera needs "an agent that budgets
-   across providers".
-8. **The fallback path**: same allocator, subgraph disabled → blind round-robin.
-   It exists only to be filmed, and it is beat 3.
-
-## Thursday — freeze and record
-
-9. Multi-seed batch across all four usable models, both targets.
-10. Minimal web view (judged criterion, Usability).
-11. **Feature freeze 18:00**, then record.
-12. Stretch, only if all the above stands: the **ratchet** (v1→v2→v3, and where
-    it stalls), or the **historical-pair task** (§13), or Uniswap.
-
-## Friday morning — submission only, no code
-
-13. README pass, `AI_USAGE.md` final, submission form, partner prizes selected,
-    Start Fresh registration.
+**What the project can honestly claim today**: the evaluation engine works end to
+end — metered x402 payment, three proof obligations, gates 1-3, an order-neutral
+instrument with its own control, a floor and a ceiling, receipts anchored on HCS
+and verifiable from outside. **Not** that it has measured anything about
+memorisation.
 
 ---
 
-⚠️ **Steps 1-3 come before anything new.** They are places where this repository
-claims something it does not do, and that is a worse failure than a missing
-feature — the whole project is an argument about not overclaiming.
+# Remaining plan
+
+## Wednesday 9 — The Graph, the whole day (R7)
+
+1. **`RunRegistry`** on Base Sepolia: one event per run — content hash, HCS topic
+   and sequence, and the few fields the allocator filters on. A **pointer, not a
+   copy** (D-09).
+2. **Subgraph** indexing it, published to Studio.
+3. **The allocator** (R10). ⚠️ Required by *both* remaining prizes: The Graph
+   needs it as the consumer, Hedera needs "an agent that budgets across providers".
+4. **The fallback path** — same allocator, subgraph disabled, blind round-robin.
+   It exists only to be filmed, and it is demo beat 3.
+
+## Thursday 10 — freeze and record
+
+5. Multi-seed batch across the usable models.
+6. Minimal web view (judged: Usability).
+7. **Feature freeze 18:00**, then record.
+8. Stretch only: `toHexString` as a second target earning `FUZZED` (the vocabulary
+   showing two labels), the ratchet, or the historical pair.
+
+## Friday 11 morning — submission only, no code

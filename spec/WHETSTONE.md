@@ -283,7 +283,7 @@ incomparable and was a real gap in earlier revisions.
 |---|---|
 | The **mutated variant** source, complete and compilable | The **original OZ source**. If the model sees both it can diff them, recover the mutation, and the anti-memorization defence evaporates |
 | The function signature and a one-line task statement | Any reference to solady, or to the baseline's gas figure |
-| The **gas scenario** (fixture set) it is measured on | The names "OpenZeppelin", "solady", "Whetstone" anywhere in the prompt |
+| A **precise description of the gas scenario** it is measured on — every power of two and its two neighbours, plus zero and the maximum. ⚠️ The 769-value vector itself is **not** sent: the description determines it exactly, and shipping ~20 KB of literals would cost tokens for no added information. The vector's digest is in the receipt, so what was measured stays checkable | The names "OpenZeppelin", "solady", "Whetstone" anywhere in the prompt |
 | The toolchain: solc version, evm_version, optimizer runs | Prior patches by other models in the same batch |
 
 ### The loop

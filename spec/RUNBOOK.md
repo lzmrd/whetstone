@@ -91,63 +91,99 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
 
 ```json
 {
-  "schema":        "whetstone/receipt/v2",
-  "run_id":        "",
-  "round":         1,
-  "status":        "provisional",
-
+  "schema": "whetstone/receipt/v2",
+  "run_id": "mtsh0edy-dd05bcbd",
+  "round": 1,
+  "status": "provisional",
   "task": {
-    "function":      "OZ/Math.log2",
-    "variant_hash":  "keccak256 of the mutated variant source",
-    "baseline_hash": "keccak256 of the baseline source",
-    "scenario_id":   "0xd8fd95feb303bffc21724cbcca5ffad44286df2c602461e73026abc243e81f00",
+    "id": "log256-bytelen/v1",
+    "function": "contracts/src/tasks/Task.sol",
+    "variant_hash": "b4935894c8ce16bde67bbffc672428b1533c4f1e1e8b1ce21a2933183db6bfa5",
+    "baseline_hash": null,
+    "scenario_id": "0x…",
     "scenario_name": "boundary/v1",
-    "prompt_hash":   "keccak256 of the fixed system prompt"
+    "prompt_hash": "…"
   },
-
   "agent": {
-    "model":       "provider/model@version",
-    "seed":        0,
-    "temperature": null,
-    "max_rounds":  8,
-    "rounds_used": 3
+    "model": "groq/openai/gpt-oss-120b",
+    "seed": 1,
+    "temperature": 0.2,
+    "max_rounds": 8,
+    "rounds_used": 1,
+    "outcomes": [
+      "proved"
+    ],
+    "stop_reason": "proved"
   },
-
   "cost": {
-    "tokens_in":     0,
-    "tokens_out":    0,
-    "price_table":   { "version": 1, "sha256": "", "retrieved": "2026-09-06" },
-    "usd_list":      "0.000000",
-    "hbar_paid":     "0",
-    "settle_tx":     ""
+    "tokens_in": 0,
+    "tokens_out": 0,
+    "price_table": {
+      "version": 3,
+      "sha256": "d38ae1be6e4d3112e9026016d7f10cc16723dafafa6879a941f03455b221e8c2",
+      "retrieved": "2026-09-07"
+    },
+    "usd_list": "0.00000000",
+    "hbar_paid": "0.00000000",
+    "settlements": [],
+    "settle_tx": null,
+    "paid_through_gateway": true
   },
-
   "gas": {
-    "inputs": 769, "scored": 0, "skipped": 0,
-    "v1_total": 0, "baseline_total": 0, "patch_total": 0,
-    "patch_max_regression": 0, "patch_regressed_inputs": 0,
-    "relative_progress": 0.0
+    "inputs": 769,
+    "scored": 768,
+    "skipped": 1,
+    "v1_total": 0,
+    "patch_total": 0,
+    "saved_total": 0,
+    "patch_max_regression": 0,
+    "patch_regressed_inputs": 0,
+    "baseline_total": 0,
+    "relative_progress": 0,
+    "trivial_total": 0,
+    "trivial_saves_per_call": 69,
+    "beats_trivial_by": 0
   },
-
   "guarantee": {
-    "label":  "FORMAL_NO_EXPLICIT_INPUT_BOUND | FORMAL_BOUNDED | FUZZED | UNKNOWN",
-    "bounds": { "max_iterations": null, "max_input_len": null },
+    "label": "FORMAL_NO_EXPLICIT_INPUT_BOUND",
+    "bounds": {
+      "max_iterations": -1,
+      "max_input_len": null
+    },
     "assumptions": [],
+    "fuzz_campaign": null,
     "reverts_covered": true,
-    "mutation_refuted": true
+    "mutation_refuted": true,
+    "proof_1_baseline_equals_task": "FORMAL_NO_EXPLICIT_INPUT_BOUND",
+    "proof_3_trivial_equals_task": "FORMAL_NO_EXPLICIT_INPUT_BOUND"
   },
-
   "toolchain": {
-    "solc": "0.8.35", "evm_version": "osaka", "optimizer_runs": 200,
-    "checker": "hevm", "checker_version": "0.58.0", "solver": "bitwuzla",
-    "wrapper_hash": "", "oz_version": "v5.7.0", "solady_version": "v0.1.26"
+    "solc": "0.8.35",
+    "evm_version": "osaka",
+    "optimizer_runs": 200,
+    "bytecode_hash": "none",
+    "checker": "hevm",
+    "checker_version": "0.58.0 [no git revision present]",
+    "solver": "bitwuzla",
+    "oz_version": "v5.7.0",
+    "solady_version": "v0.1.26",
+    "forge_std_version": "v1.16.2"
   },
-
-  "artifacts": { "repo": "", "commit": "", "path": "" },
-
-  "timestamp": ""
+  "artifacts": {
+    "repo": "https://github.com/lzmrd/whetstone",
+    "commit": "ecbb4b33480f2dbdaf5f38bbdf3ba77cf3f2715d",
+    "dirty": true,
+    "patch_sha256": "77999a365ef1e925840f71004d2d3507a588095af1177d018e678014e868a721",
+    "patch_source": "<the model patch, verbatim>"
+  },
+  "timestamp": "2026-09-08T09:32:02.922Z"
 }
 ```
+
+⚠️ **Generated from `buildReceipt()`, not maintained by hand.** It drifted badly
+once: `oz_version`, `solady_version` and `wrapper_hash` were documented here for
+days and never emitted, while sixteen fields the code did emit were undocumented.
+Regenerate rather than edit.
 
 ⚠️ Every field above exists because something breaks without it:
 
