@@ -100,14 +100,14 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
 ```json
 {
   "schema": "whetstone/receipt/v2",
-  "run_id": "mtsk3g31-ce087545",
+  "run_id": "mtsk686d-ce087545",
   "round": 1,
   "status": "provisional",
   "task": {
     "id": "log256-bytelen/v1",
     "function": "contracts/src/tasks/Task.sol",
     "variant_hash": "4134b29f5dd1f3b685d6a5b6e7c2d30aec4951cf649d6015258b5360395de214",
-    "baseline_hash": null,
+    "baseline_hash": "c6bd166db6ddcf84bc0ce6b477f5f07b24b42b5f23dff9dd065cc12a2f05dccf",
     "scenario_id": "0xd8fd95feb303bffc21724cbcca5ffad44286df2c602461e73026abc243e81f00",
     "scenario_name": "boundary/v1",
     "prompt_hash": "7efff1696038d9e68f8da4ccbc710ce28ba1e83665c02049961aa7d4afeae42b"
@@ -125,22 +125,22 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
   },
   "cost": {
     "tokens_in": 565,
-    "tokens_out": 2545,
+    "tokens_out": 1476,
     "price_table": {
       "version": 3,
       "sha256": "d38ae1be6e4d3112e9026016d7f10cc16723dafafa6879a941f03455b221e8c2",
       "retrieved": "2026-09-07"
     },
-    "usd_list": "0.00161175",
+    "usd_list": "0.00097035",
     "hbar_paid": "0.00107992",
     "settlements": [
       {
-        "tx": "0.0.7162784@1788865086.426744795",
+        "tx": "0.0.7162784@1788865219.246996410",
         "amount_tinybar": "107992",
         "pay_to": "0.0.10375344"
       }
     ],
-    "settle_tx": "0.0.7162784@1788865086.426744795",
+    "settle_tx": "0.0.7162784@1788865219.246996410",
     "paid_through_gateway": true
   },
   "gas": {
@@ -148,15 +148,15 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
     "scored": 768,
     "skipped": 1,
     "v1_total": 616320,
-    "patch_total": 468480,
-    "saved_total": 147840,
+    "patch_total": 462336,
+    "saved_total": 153984,
     "patch_max_regression": 0,
     "patch_regressed_inputs": 0,
     "baseline_total": 398592,
-    "relative_progress": 0.679,
+    "relative_progress": 0.7072,
     "trivial_total": 563328,
     "trivial_saves_per_call": 69,
-    "beats_trivial_by": 124
+    "beats_trivial_by": 132
   },
   "guarantee": {
     "label": "FORMAL_NO_EXPLICIT_INPUT_BOUND",
@@ -190,17 +190,17 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
   },
   "artifacts": {
     "repo": "https://github.com/lzmrd/whetstone",
-    "commit": "29fcd058c00e877cc09bf7f8016f6e8d8e89fdff",
+    "commit": "2d3db5a40e92e296b0951fd9e46398b95fd390f1",
     "dirty": false,
-    "patch_sha256": "05a6b02d93d1934a9847d652ecb5273a44a40b4004007932939a56e28d84d4c2",
+    "patch_sha256": "d058b6ec986803e1ef667081459537710794d51a8b93791e051a067bbefdd672",
     "patch_source": "<the model patch, verbatim>"
   },
-  "timestamp": "2026-09-08T10:58:23.922Z"
+  "timestamp": "2026-09-08T11:00:33.642Z"
 }
 ```
 
 ⚠️ **This is a REAL receipt, copied from a run, not a hand-written sample.** It is
-`artifacts/mtsk3g31-ce087545/receipt.json`, published to HCS as sequence 140 and
+`artifacts/mtsk686d-ce087545/receipt.json`, published to HCS as sequence 143 and
 read back from the mirror node with the hash matching — only `patch_source` is
 elided for length. It drifted badly once when it was maintained by hand:
 `oz_version`, `solady_version` and `wrapper_hash` were documented here for days
