@@ -41,3 +41,30 @@ max_test_rejects = 100000
 
 [profile.ci]
 fuzz = { runs = 100_000 }
+
+# ── The Graph: RunRegistry, deployed to Base Sepolia ────────────────────────
+#
+# ⚠️ A SEPARATE PROFILE, and separate source directory, on purpose. The default
+# profile above is the measurement instrument: its solc version, evm_version and
+# optimizer settings are serialized into every receipt, and changing them makes
+# previously recorded gas numbers incomparable. The registry has nothing to do
+# with measurement -- it is a log on a different chain -- so it must not be able
+# to drag the measurement profile with it.
+#
+# Two settings differ, both required:
+#   via_ir      the event carries 13 fields (4 for the cross-chain pointer, 7 the
+#               allocator filters on) and the legacy pipeline runs out of stack.
+#               The fields are irreducible, so the pipeline changes rather than
+#               the information the consumer gets.
+#   evm_version Base Sepolia does not run 'osaka'. Deploying osaka-compiled
+#               bytecode to a chain that does not support it is a deploy that
+#               either reverts or, worse, produces a contract that traps on an
+#               opcode the chain does not know.
+[profile.registry]
+src = 'contracts/registry'
+test = 'contracts/registry'
+out = 'out-registry'
+via_ir = true
+evm_version = 'cancun'
+optimizer = true
+optimizer_runs = 200

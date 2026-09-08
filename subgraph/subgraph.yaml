@@ -1,0 +1,35 @@
+specVersion: 1.2.0
+description: >-
+  Whetstone run registry. Each row is a POINTER to a canonical receipt on Hedera
+  Consensus Service, plus the few fields the budget allocator filters on. The
+  allocator queries this subgraph to decide which model gets the next paid round;
+  with it disabled the allocator has no memory and falls back to round-robin.
+repository: https://github.com/lzmrd/whetstone
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: RunRegistry
+    network: base-sepolia
+    source:
+      abi: RunRegistry
+      # ⚠️ Filled by ./scripts/deploy-registry.sh, which prints both lines.
+      # startBlock must be the deploy block: indexing base-sepolia from genesis
+      # takes hours and finds nothing.
+      address: "0x0000000000000000000000000000000000000000"
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Run
+        - Model
+      abis:
+        - name: RunRegistry
+          file: ./abis/RunRegistry.json
+      eventHandlers:
+        - event: >-
+            RunRecorded(indexed address,string,bytes32,string,uint64,string,string,string,int256,int256,uint256,int256,uint64)
+          handler: handleRunRecorded
+      file: ./src/mapping.ts

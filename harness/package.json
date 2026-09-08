@@ -15,6 +15,9 @@
     "hcs:init": "node --env-file=../.env src/hcs-init.mjs",
     "gateway": "node --env-file=../.env ../gateway/server.mjs",
     "batch": "node --env-file=../.env src/batch.mjs",
+    "allocate": "node --env-file=../.env src/allocate.mjs",
+    "test": "node --test 'test/*.test.mjs'",
+    "registry:retry": "node --env-file=../.env src/registry-retry.mjs",
     "clean": "rm -rf ../.run/c-*"
   },
   "dependencies": {

@@ -1,0 +1,67 @@
+"""
+One recorded run. Immutable: the registry is an append-only log and a row is
+never revised — a correction is a new row, which is the property that makes the
+log tamper-evident in the first place.
+"""
+type Run @entity(immutable: true) {
+  id: Bytes!
+  "⚠️ Anyone may write to the registry. Every consumer MUST filter on this."
+  recorder: Bytes!
+  runId: String!
+
+  "sha256 of the exact bytes published to HCS. Fetch the message from the mirror node and compare."
+  receiptHash: Bytes!
+  hcsTopicId: String!
+  hcsSequence: BigInt!
+
+  model: Model!
+  taskId: String!
+  label: String!
+
+  "Signed: a patch can be worse than what it replaced."
+  savedPerCall: BigInt!
+  savedTotal: BigInt!
+  maxRegression: BigInt!
+  "Scaled by 1e4. Above 10000 means the patch beat the baseline, which is legitimate."
+  relativeProgressE4: BigInt!
+  usdListNano: BigInt!
+
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+"""
+Per-model running state — this is what makes the subgraph LOAD-BEARING rather
+than decorative.
+
+⚠️ The allocator's policy (R10) is "next round to the best gas saved per dollar,
+unless the model produced two consecutive UNKNOWN labels". `consecutiveUnknown`
+is a fold over the model's history in block order: it cannot be computed from a
+single event, and computing it client-side means fetching and replaying every
+run ever recorded on every decision. The subgraph maintains it as rows arrive.
+Remove the subgraph and the allocator loses exactly this, which is why it falls
+back to blind round-robin.
+"""
+type Model @entity(immutable: false) {
+  "recorder-name, so two recorders never merge into one row."
+  id: String!
+  recorder: Bytes!
+  name: String!
+  runs: [Run!]! @derivedFrom(field: "model")
+
+  runCount: BigInt!
+  "Sum of the per-call savings. Divided by runCount this is the mean the allocator ranks on."
+  sumSavedPerCall: BigInt!
+  sumUsdListNano: BigInt!
+  "Total gas saved over the scenario, per nanodollar spent. The allocator's primary key."
+  totalSavedTotal: BigInt!
+
+  formalCount: BigInt!
+  fuzzedCount: BigInt!
+  unknownCount: BigInt!
+  "⚠️ The fold. Reset to zero by any non-UNKNOWN label."
+  consecutiveUnknown: BigInt!
+
+  lastRunAt: BigInt!
+  lastLabel: String!
+}

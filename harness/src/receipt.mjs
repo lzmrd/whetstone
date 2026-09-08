@@ -110,6 +110,13 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
           v1_total: run.gas.v1_total,
           patch_total: run.gas.patch_total,
           saved_total: run.gas.saved_total,
+          // ⚠️ The headline number, and it was NOT in the receipt. Every batch
+          // record, every leaderboard row and the CLI all report gas per call,
+          // and the canonical record carried only the total -- so a consumer had
+          // to re-derive the primary metric and hope it divided by the same
+          // denominator we did. Found while mapping the receipt onto the
+          // registry event: the field read 0 for a run that saved 201.
+          saved_per_call: run.gas.saved_per_call,
           patch_max_regression: run.gas.patch_max_regression,
           patch_regressed_inputs: run.gas.patch_regressed_inputs,
           // ⚠️ null, not 0. Relative progress needs a baseline, the baseline is

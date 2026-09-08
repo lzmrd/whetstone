@@ -12,6 +12,7 @@ import { runAgent, INTERFACE } from './agent.mjs';
 import { checkerVersion } from './equivalence.mjs';
 import { resolve, TABLE_HASH } from './providers.mjs';
 import { exportArtifacts } from './artifacts.mjs';
+import { recordRun } from './registry.mjs';
 import { buildReceipt, publishReceipt } from './receipt.mjs';
 import { loadManifest, prepareTask } from './task.mjs';
 import { requireSelfCheck } from './selfcheck.mjs';
@@ -112,6 +113,21 @@ receipt      HCS ${ptr.topic_id} seq ${ptr.sequence_number}  (${ptr.bytes} bytes
              read back from mirror: found=${ptr.mirror.found} hash_matches=${ptr.mirror.matches}
              ${ptr.mirror.url}`);
     if (!ptr.mirror.matches) console.log('\n⚠️  MIRROR MISMATCH — the published record differs from what was sent.\n');
+
+    // ⚠️ AFTER the HCS publish, never before: the row is a POINTER, and the
+    // topic and sequence number it points at do not exist until the canonical
+    // record does. A registry row written first would point at nothing.
+    const reg = await recordRun(receipt, ptr);
+    if (reg.recorded) {
+      console.log(`registry     Base Sepolia ${reg.address}
+             tx ${reg.tx}`);
+    } else {
+      // ⚠️ Not fatal, and not silent (§9). The run is paid for and its canonical
+      // record exists; what is missing is the index card, so it would vanish
+      // from the subgraph and from the allocator's memory. Queued for retry.
+      console.log(`registry     NOT RECORDED — ${reg.reason}
+             queued in harness/.runs/registry-pending.jsonl for retry`);
+    }
   } else {
     console.log('\nreceipt      not published (HCS_TOPIC_ID unset or --no-receipt)');
   }

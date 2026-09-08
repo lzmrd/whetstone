@@ -1,0 +1,158 @@
+/**
+ * The Base Sepolia half of the record: a pointer to the HCS receipt, indexable.
+ *
+ * ⚠️ WHY THIS EXISTS AT ALL, stated before the code so nobody has to infer it:
+ * The Graph cannot index Hedera and HCS is not EVM, so the canonical record —
+ * the one tied to the payment — stays on HCS and this emits an index card
+ * pointing at it. Given an event you fetch the HCS message from the mirror node
+ * and compare hashes; the cross-chain link is checkable without our machine.
+ *
+ * ⚠️ It records; it verifies NOTHING (D-09). A contract cannot compile a patch,
+ * call hevm, or measure gas.
+ *
+ * ⚠️ NO NEW SDK. This shells out to `cast`, which the project already requires
+ * and pins. Adding viem or ethers to write twelve fields to a testnet log would
+ * add a dependency, a lockfile and a supply chain to a repository whose claim is
+ * that a stranger can reproduce it.
+ */
+
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { appendFileSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const run = promisify(execFile);
+const REPO = fileURLToPath(new URL('../../', import.meta.url));
+
+/**
+ * ⚠️ §9 anticipates this failure: RPC down or a bad nonce leaves an HCS receipt
+ * with no catalogue card, and the run vanishes from the subgraph. The local log
+ * is the source of truth and the queue for retries — a hole in the registry must
+ * be recoverable, not silently accepted.
+ */
+const PENDING = join(REPO, 'harness', '.runs', 'registry-pending.jsonl');
+
+const SIG =
+  'record((string,bytes32,string,uint64,string,string,string,int256,int256,uint256,int256,uint64))';
+
+/**
+ * Receipt + HCS pointer → the twelve fields, in the struct's order.
+ *
+ * ⚠️ The pointer is a SECOND argument because it is not in the receipt: the
+ * topic and sequence number only exist after the receipt has been published, so
+ * a receipt cannot contain them. The first version of this file read
+ * `receipt.hcs.*` and would have written an empty topic and sequence 0 into
+ * every row -- the same documented-but-absent failure that left `oz_version` and
+ * `baseline_hash` null for days. Caught by running it against a real receipt
+ * instead of against the shape it was assumed to have.
+ */
+export function toRow(receipt, hcs = {}) {
+  const g = receipt.gas ?? {};
+  /**
+   * ⚠️ LOUD, not zero. `saved_per_call` was absent from the receipt and the
+   * first version of this mapping quietly wrote 0 for a run that saved 201 --
+   * a field that reads 0 looks like "the model achieved nothing", which is a
+   * plausible result and would never have been questioned. Every field this
+   * registry row commits to must be present, or the write fails.
+   */
+  const req = (name, v) => {
+    if (!Number.isFinite(v)) {
+      throw new Error(
+        `registry row would be wrong: receipt.gas.${name} is ${JSON.stringify(v)}. ` +
+          `Writing a default here publishes a number nobody measured.`,
+      );
+    }
+    return v;
+  };
+  const nz = (v) => (Number.isFinite(v) ? v : 0);
+  return {
+    runId: receipt.run_id,
+    // ⚠️ The receipt's own sha256, i.e. of the EXACT bytes published to HCS.
+    receiptHash: `0x${hcs.content_sha256 ?? '0'.repeat(64)}`,
+    hcsTopicId: hcs.topic_id ?? '',
+    hcsSequence: hcs.sequence_number ?? 0,
+    model: receipt.agent?.model ?? '',
+    taskId: receipt.task?.id ?? '',
+    label: receipt.guarantee?.label ?? 'UNKNOWN',
+    // ⚠️ Read straight from the receipt, never re-derived. If it is missing the
+    // row must not silently carry 0 -- that is a regression reported as a
+    // perfect result.
+    savedPerCall: Math.trunc(req('saved_per_call', g.saved_per_call)),
+    savedTotal: Math.trunc(req('saved_total', g.saved_total)),
+    maxRegression: Math.trunc(req('patch_max_regression', g.patch_max_regression)),
+    // Scaled by 1e4 and TRUNCATED, not rounded: a displayed number must never be
+    // more favourable than the measured one.
+    relativeProgressE4: Math.trunc(req('relative_progress', g.relative_progress) * 1e4),
+    // Nanodollars. usd_list is a string in the receipt.
+    usdListNano: Math.trunc(Number(receipt.cost?.usd_list ?? 0) * 1e9),
+  };
+}
+
+function tuple(r) {
+  const q = (s) => JSON.stringify(String(s));
+  return `(${[
+    q(r.runId), r.receiptHash, q(r.hcsTopicId), r.hcsSequence,
+    q(r.model), q(r.taskId), q(r.label),
+    r.savedPerCall, r.savedTotal, r.maxRegression, r.relativeProgressE4, r.usdListNano,
+  ].join(',')})`;
+}
+
+function queue(row, why) {
+  mkdirSync(dirname(PENDING), { recursive: true });
+  appendFileSync(PENDING, `${JSON.stringify({ row, why, at: new Date().toISOString() })}\n`);
+}
+
+/**
+ * @returns {{recorded: boolean, tx: string|null, address: string|null, reason: string|null}}
+ */
+export async function recordRun(receipt, hcs = {}) {
+  const address = process.env.RUN_REGISTRY_ADDRESS;
+  const rpc = process.env.BASE_SEPOLIA_RPC_URL;
+  const key = process.env.BASE_SEPOLIA_PRIVATE_KEY;
+  const row = toRow(receipt, hcs);
+
+  if (!address || !rpc || !key) {
+    const reason = 'RUN_REGISTRY_ADDRESS / BASE_SEPOLIA_RPC_URL / BASE_SEPOLIA_PRIVATE_KEY not set';
+    queue(row, reason);
+    return { recorded: false, tx: null, address: null, reason };
+  }
+
+  try {
+    const { stdout } = await run(
+      'cast',
+      ['send', address, SIG, tuple(row), '--rpc-url', rpc, '--private-key', key, '--json'],
+      { cwd: REPO, maxBuffer: 8e6 },
+    );
+    const tx = JSON.parse(stdout).transactionHash;
+    return { recorded: true, tx, address, reason: null };
+  } catch (e) {
+    const reason = `${e.stderr ?? e.message}`.trim().split('\n')[0];
+    queue(row, reason);
+    return { recorded: false, tx: null, address, reason };
+  }
+}
+
+/** Drain the queue. Anything still failing stays queued. */
+export async function retryPending() {
+  if (!existsSync(PENDING)) return { attempted: 0, recorded: 0, stillPending: 0 };
+  const lines = readFileSync(PENDING, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const address = process.env.RUN_REGISTRY_ADDRESS;
+  const rpc = process.env.BASE_SEPOLIA_RPC_URL;
+  const key = process.env.BASE_SEPOLIA_PRIVATE_KEY;
+  if (!address || !rpc || !key) return { attempted: 0, recorded: 0, stillPending: lines.length };
+
+  const left = [];
+  let recorded = 0;
+  for (const entry of lines) {
+    try {
+      await run('cast', ['send', address, SIG, tuple(entry.row), '--rpc-url', rpc,
+                         '--private-key', key, '--json'], { cwd: REPO, maxBuffer: 8e6 });
+      recorded++;
+    } catch (e) {
+      left.push({ ...entry, why: `${e.stderr ?? e.message}`.trim().split('\n')[0] });
+    }
+  }
+  writeFileSync(PENDING, left.map((e) => `${JSON.stringify(e)}\n`).join(''));
+  return { attempted: lines.length, recorded, stillPending: left.length };
+}

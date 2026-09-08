@@ -6,6 +6,9 @@
 
 # foundry
 out/
+# ⚠️ The registry profile's build dir. The subgraph needs the ABI, so that ONE
+# file is copied to subgraph/abis/ and committed -- the build tree is not.
+out-registry/
 cache/
 cache_forge/
 broadcast/
@@ -38,3 +41,8 @@ harness/.runs/
 # project whose headline claim is third-party recomputation.
 .tools/
 .venv-tools/
+
+# subgraph build products and tooling
+subgraph/node_modules/
+subgraph/generated/
+subgraph/build/
