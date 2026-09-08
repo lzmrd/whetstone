@@ -62,7 +62,13 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
       id: run.task_id,
       function: taskPath,
       variant_hash: sha256(taskSource),
-      baseline_hash: run.baseline_hash ?? null,
+      // ⚠️ Was `run.baseline_hash ?? null` against a run object that never set
+      // it, so every published receipt carried null -- the same
+      // documented-but-unemitted failure as oz_version. The baseline IS the
+      // denominator: a receipt that does not commit to it cannot support
+      // "nobody has to take our word that the baseline was not shaped to
+      // flatter or punish".
+      baseline_hash: run.baseline_runtime ? sha256(run.baseline_runtime) : null,
       scenario_id: run.gas?.scenario_id ?? null,
       // ⚠️ Read from the source of truth, not retyped. A hardcoded name here
       // could drift from Scenario.sol while the digest kept changing underneath.

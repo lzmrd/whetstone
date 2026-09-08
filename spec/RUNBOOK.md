@@ -100,21 +100,21 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
 ```json
 {
   "schema": "whetstone/receipt/v2",
-  "run_id": "mtsh0edy-dd05bcbd",
+  "run_id": "mtsk3g31-ce087545",
   "round": 1,
   "status": "provisional",
   "task": {
     "id": "log256-bytelen/v1",
     "function": "contracts/src/tasks/Task.sol",
-    "variant_hash": "b4935894c8ce16bde67bbffc672428b1533c4f1e1e8b1ce21a2933183db6bfa5",
+    "variant_hash": "4134b29f5dd1f3b685d6a5b6e7c2d30aec4951cf649d6015258b5360395de214",
     "baseline_hash": null,
-    "scenario_id": "0x…",
+    "scenario_id": "0xd8fd95feb303bffc21724cbcca5ffad44286df2c602461e73026abc243e81f00",
     "scenario_name": "boundary/v1",
-    "prompt_hash": "…"
+    "prompt_hash": "7efff1696038d9e68f8da4ccbc710ce28ba1e83665c02049961aa7d4afeae42b"
   },
   "agent": {
     "model": "groq/openai/gpt-oss-120b",
-    "seed": 1,
+    "seed": 0,
     "temperature": 0.2,
     "max_rounds": 8,
     "rounds_used": 1,
@@ -124,33 +124,39 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
     "stop_reason": "proved"
   },
   "cost": {
-    "tokens_in": 0,
-    "tokens_out": 0,
+    "tokens_in": 565,
+    "tokens_out": 2545,
     "price_table": {
       "version": 3,
       "sha256": "d38ae1be6e4d3112e9026016d7f10cc16723dafafa6879a941f03455b221e8c2",
       "retrieved": "2026-09-07"
     },
-    "usd_list": "0.00000000",
-    "hbar_paid": "0.00000000",
-    "settlements": [],
-    "settle_tx": null,
+    "usd_list": "0.00161175",
+    "hbar_paid": "0.00107992",
+    "settlements": [
+      {
+        "tx": "0.0.7162784@1788865086.426744795",
+        "amount_tinybar": "107992",
+        "pay_to": "0.0.10375344"
+      }
+    ],
+    "settle_tx": "0.0.7162784@1788865086.426744795",
     "paid_through_gateway": true
   },
   "gas": {
     "inputs": 769,
     "scored": 768,
     "skipped": 1,
-    "v1_total": 0,
-    "patch_total": 0,
-    "saved_total": 0,
+    "v1_total": 616320,
+    "patch_total": 468480,
+    "saved_total": 147840,
     "patch_max_regression": 0,
     "patch_regressed_inputs": 0,
-    "baseline_total": 0,
-    "relative_progress": 0,
-    "trivial_total": 0,
+    "baseline_total": 398592,
+    "relative_progress": 0.679,
+    "trivial_total": 563328,
     "trivial_saves_per_call": 69,
-    "beats_trivial_by": 0
+    "beats_trivial_by": 124
   },
   "guarantee": {
     "label": "FORMAL_NO_EXPLICIT_INPUT_BOUND",
@@ -162,6 +168,11 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
     "fuzz_campaign": null,
     "reverts_covered": true,
     "mutation_refuted": true,
+    "mutation_strength": {
+      "diverged": 769,
+      "total": 769,
+      "fraction": 1
+    },
     "proof_1_baseline_equals_task": "FORMAL_NO_EXPLICIT_INPUT_BOUND",
     "proof_3_trivial_equals_task": "FORMAL_NO_EXPLICIT_INPUT_BOUND"
   },
@@ -179,19 +190,23 @@ Testnet is **open access, no API key**. Mainnet is not yet supported.
   },
   "artifacts": {
     "repo": "https://github.com/lzmrd/whetstone",
-    "commit": "ecbb4b33480f2dbdaf5f38bbdf3ba77cf3f2715d",
-    "dirty": true,
-    "patch_sha256": "77999a365ef1e925840f71004d2d3507a588095af1177d018e678014e868a721",
+    "commit": "29fcd058c00e877cc09bf7f8016f6e8d8e89fdff",
+    "dirty": false,
+    "patch_sha256": "05a6b02d93d1934a9847d652ecb5273a44a40b4004007932939a56e28d84d4c2",
     "patch_source": "<the model patch, verbatim>"
   },
-  "timestamp": "2026-09-08T09:32:02.922Z"
+  "timestamp": "2026-09-08T10:58:23.922Z"
 }
 ```
 
-⚠️ **Generated from `buildReceipt()`, not maintained by hand.** It drifted badly
-once: `oz_version`, `solady_version` and `wrapper_hash` were documented here for
-days and never emitted, while sixteen fields the code did emit were undocumented.
-Regenerate rather than edit.
+⚠️ **This is a REAL receipt, copied from a run, not a hand-written sample.** It is
+`artifacts/mtsk3g31-ce087545/receipt.json`, published to HCS as sequence 140 and
+read back from the mirror node with the hash matching — only `patch_source` is
+elided for length. It drifted badly once when it was maintained by hand:
+`oz_version`, `solady_version` and `wrapper_hash` were documented here for days
+and never emitted, while sixteen fields the code did emit were undocumented.
+**Regenerate from a run rather than edit**, so the documented schema cannot be a
+schema nothing produces.
 
 ⚠️ Every field above exists because something breaks without it:
 

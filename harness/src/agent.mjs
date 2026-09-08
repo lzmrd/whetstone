@@ -236,6 +236,7 @@ export async function runAgent({
     task_id: prepared.manifest.id,
     mutation_refuted: prepared.mutation_refuted,
     mutation_strength: prepared.mutation_strength,
+    baseline_runtime: baseline.runtime,
     baseline_total: baselineGas.patch_total,
     trivial_total: trivialGas?.patch_total ?? null,
     trivial_saves_per_call: trivialGas?.saved_per_call ?? null,
