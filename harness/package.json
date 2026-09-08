@@ -18,6 +18,7 @@
     "allocate": "node --env-file=../.env src/allocate.mjs",
     "test": "node --test 'test/*.test.mjs'",
     "web": "node --env-file=../.env src/serve-web.mjs",
+    "artifacts:check": "node --env-file=../.env src/check-artifacts.mjs",
     "registry:retry": "node --env-file=../.env src/registry-retry.mjs",
     "clean": "rm -rf ../.run/c-*"
   },

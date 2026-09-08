@@ -18,6 +18,7 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SYSTEM_PROMPT } from './prompt.mjs';
+import { canonical } from './hcs.mjs';
 
 const REPO = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -43,7 +44,10 @@ export function exportArtifacts({ receipt, prepared, run }) {
     'original.sol': read(m.original.path),
     'scenario.sol': read('contracts/test/Scenario.sol'),
     'prompt.txt': SYSTEM_PROMPT,
-    'receipt.json': JSON.stringify(receipt, null, 2),
+    // ⚠️ The EXACT bytes published to HCS, never a pretty-printed copy. This
+    // file is evidence, and evidence must hash to the value the chain committed
+    // to. Read it with `jq . receipt.json`.
+    'receipt.json': canonical(receipt),
     // Runtime bytecode of both sides: what hevm actually compared, and what the
     // gas instrument actually measured. Everything above compiles to these.
     'task.runtime.hex': prepared.task.runtime,
@@ -75,8 +79,13 @@ ${receipt.artifacts.dirty ? `⚠️ **The working tree was DIRTY when this ran**
 fully describe what produced these numbers. The bundle is still self-contained —
 every input is in this directory — but the repository state is not pinned by that
 hash alone.\n` : ''}
+⚠️ \`receipt.json\` is the **exact bytes published to Hedera**, compact and with
+no trailing newline, so \`sha256sum receipt.json\` reproduces the hash recorded on
+Base Sepolia. Read it with \`jq . receipt.json\`; do not reformat the file.
+
 | Claim | How to check it yourself |
 |---|---|
+| this bundle is the run the chains recorded | \`sha256sum receipt.json\` equals the \`receiptHash\` on Base Sepolia, and equals the sha256 of the reassembled HCS message |
 | equivalence | \`hevm equivalence --code-a-file task.runtime.hex --code-b-file patch.runtime.hex --sig 'f(uint256)' --max-iterations -1\`, with hevm ${receipt.toolchain.checker_version} |
 | the baseline computes the task | same command on \`baseline.runtime.hex\` and \`task.runtime.hex\` — must PASS |
 | the mutation is semantic | same command on \`task.runtime.hex\` and \`original.runtime.hex\` — must REFUTE |
@@ -91,7 +100,10 @@ request. The falsification bounty in the README applies.
 
   const written = [];
   for (const [name, content] of Object.entries(files)) {
-    writeFileSync(join(dir, name), content.endsWith('\n') ? content : `${content}\n`);
+    // ⚠️ receipt.json gets no trailing newline: one byte changes the sha256 and
+    // breaks the only property the file has.
+    const exact = name === 'receipt.json';
+    writeFileSync(join(dir, name), exact || content.endsWith('\n') ? content : `${content}\n`);
     written.push(`artifacts/${receipt.run_id}/${name}`);
   }
   return { dir: `artifacts/${receipt.run_id}`, files: written };

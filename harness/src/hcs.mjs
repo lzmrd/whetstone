@@ -53,13 +53,26 @@ export async function createTopic(memo = 'whetstone/receipts/v2') {
  * Submit one receipt. Returns the pointer that Base Sepolia will later carry:
  * topic, sequence number, consensus timestamp and the content hash.
  */
+/**
+ * THE bytes of a receipt. Not "a" serialization — the one published to HCS,
+ * hashed into `content_sha256`, and committed to on Base Sepolia.
+ *
+ * ⚠️ Exported because the artifact bundle wrote its own pretty-printed copy.
+ * Same content, different bytes, different sha256 — so every published bundle
+ * hashed differently from the receipt the chains had committed to, and a reader
+ * who hashed the file we handed them would have concluded we were lying. 11 of
+ * 11 scored runs were in that state and nothing noticed, because each half was
+ * internally consistent. Two writers, one definition, so they cannot drift.
+ */
+export const canonical = (receipt) => JSON.stringify(receipt);
+
 export async function submitReceipt(receiptObject, topicId = process.env.HCS_TOPIC_ID) {
   if (!topicId) {
     throw new Error(
       'HCS_TOPIC_ID is not set. Run `npm run hcs:init` once and put the id in .env.',
     );
   }
-  const payload = JSON.stringify(receiptObject);
+  const payload = canonical(receiptObject);
   const bytes = Buffer.byteLength(payload);
 
   const c = client();

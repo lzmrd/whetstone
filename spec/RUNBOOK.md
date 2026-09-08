@@ -248,6 +248,33 @@ artifacts/<run_id>/
   RECOMPUTE.md          the commands to check every claim above, without trusting us
 ```
 
+### The publication rule
+
+> **Every SCORED run publishes its bundle. No discretion, no exceptions.**
+> Unscored attempts publish none — there is no patch to recompute — and exist
+> on-chain only, with their cost.
+
+⚠️ **Written down because it was not a rule, it was a habit.** Three complete,
+valid bundles sat untracked beside 143 tracked files and the only difference
+between them was that somebody had run `git add` for the others. A published set
+of receipts that is a hand-picked subset of the runs is a selection effect, and
+this project's headline claim is that anyone can recompute a result.
+
+Enforced by `npm run artifacts:check`, which asks the subgraph for every scored
+run and fails if any of them lacks a bundle **or if the bundle's receipt does not
+hash to the value recorded on Base Sepolia**. Presence is not enough: a bundle
+that differs from the chain is worse than a missing one, because it looks like
+evidence.
+
+⚠️ **That second condition failed on 11 of 11 runs the first time it ran.** HCS
+publishes `JSON.stringify(receipt)`; the bundle was writing
+`JSON.stringify(receipt, null, 2)` with a trailing newline. Same content,
+different bytes, different sha256 — every published bundle disagreed with the
+chain, and a reader following the instructions in RECOMPUTE.md would have
+concluded the record was false. Both writers now share one serializer
+(`canonical()` in `hcs.mjs`) and a test asserts every committed bundle is
+byte-identical to it.
+
 ⚠️ **This directory was promised here for days and never produced.** Per-run output
 went to `.run/`, which is **gitignored**, so the inputs a third party needs to
 recompute a score existed on one laptop. A receipt commits to hashes; recomputation
