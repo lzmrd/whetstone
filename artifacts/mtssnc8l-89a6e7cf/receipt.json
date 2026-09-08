@@ -1,0 +1,160 @@
+{
+  "schema": "whetstone/receipt/v2",
+  "run_id": "mtssnc8l-89a6e7cf",
+  "round": 6,
+  "status": "provisional",
+  "task": {
+    "id": "log256-bytelen/v1",
+    "function": "../contracts/src/tasks/Task.sol",
+    "variant_hash": "4134b29f5dd1f3b685d6a5b6e7c2d30aec4951cf649d6015258b5360395de214",
+    "baseline_hash": "c6bd166db6ddcf84bc0ce6b477f5f07b24b42b5f23dff9dd065cc12a2f05dccf",
+    "scenario_id": "0xd8fd95feb303bffc21724cbcca5ffad44286df2c602461e73026abc243e81f00",
+    "scenario_name": "boundary/v1",
+    "prompt_hash": "7efff1696038d9e68f8da4ccbc710ce28ba1e83665c02049961aa7d4afeae42b"
+  },
+  "agent": {
+    "model": "groq/openai/gpt-oss-20b",
+    "seed": 2,
+    "temperature": 0.2,
+    "max_rounds": 8,
+    "rounds_used": 6,
+    "outcomes": [
+      "truncated",
+      "truncated",
+      "truncated",
+      "truncated",
+      "compile",
+      "proved"
+    ],
+    "stop_reason": "proved"
+  },
+  "cost": {
+    "tokens_in": 4033,
+    "tokens_out": 35108,
+    "price_table": {
+      "version": 3,
+      "sha256": "d38ae1be6e4d3112e9026016d7f10cc16723dafafa6879a941f03455b221e8c2",
+      "retrieved": "2026-09-07"
+    },
+    "usd_list": "0.01083487",
+    "hbar_paid": "0.01302184",
+    "settlements": [
+      {
+        "tx": "0.0.7162784@1788879185.433426377",
+        "amount_tinybar": "107992",
+        "pay_to": "0.0.10375344"
+      },
+      {
+        "tx": "0.0.7162784@1788879204.925437764",
+        "amount_tinybar": "107992",
+        "pay_to": "0.0.10375344"
+      },
+      {
+        "tx": "0.0.7162784@1788879215.463153666",
+        "amount_tinybar": "108148",
+        "pay_to": "0.0.10375344"
+      },
+      {
+        "tx": "0.0.7162784@1788879255.972972374",
+        "amount_tinybar": "108148",
+        "pay_to": "0.0.10375344"
+      },
+      {
+        "tx": "0.0.7162784@1788879262.500792862",
+        "amount_tinybar": "108304",
+        "pay_to": "0.0.10375344"
+      },
+      {
+        "tx": "0.0.7162784@1788879302.900971573",
+        "amount_tinybar": "108304",
+        "pay_to": "0.0.10375344"
+      },
+      {
+        "tx": "0.0.7162784@1788879315.178602467",
+        "amount_tinybar": "108460",
+        "pay_to": "0.0.10375344"
+      },
+      {
+        "tx": "0.0.7162784@1788879354.335035670",
+        "amount_tinybar": "108460",
+        "pay_to": "0.0.10375344"
+      },
+      {
+        "tx": "0.0.7162784@1788879366.724981675",
+        "amount_tinybar": "108612",
+        "pay_to": "0.0.10375344"
+      },
+      {
+        "tx": "0.0.7162784@1788879402.220614906",
+        "amount_tinybar": "108612",
+        "pay_to": "0.0.10375344"
+      },
+      {
+        "tx": "0.0.7162784@1788879412.501841855",
+        "amount_tinybar": "109576",
+        "pay_to": "0.0.10375344"
+      },
+      {
+        "tx": "0.0.7162784@1788879449.598409426",
+        "amount_tinybar": "109576",
+        "pay_to": "0.0.10375344"
+      }
+    ],
+    "settle_tx": "0.0.7162784@1788879185.433426377",
+    "paid_through_gateway": true
+  },
+  "gas": {
+    "inputs": 769,
+    "scored": 768,
+    "skipped": 1,
+    "v1_total": 616320,
+    "patch_total": 630144,
+    "saved_total": -13824,
+    "saved_per_call": -18,
+    "patch_max_regression": 196,
+    "patch_regressed_inputs": 528,
+    "baseline_total": 398592,
+    "relative_progress": -0.0635,
+    "trivial_total": 563328,
+    "trivial_saves_per_call": 69,
+    "beats_trivial_by": -87
+  },
+  "guarantee": {
+    "label": "FORMAL_NO_EXPLICIT_INPUT_BOUND",
+    "bounds": {
+      "max_iterations": -1,
+      "max_input_len": null
+    },
+    "assumptions": [],
+    "fuzz_campaign": null,
+    "reverts_covered": true,
+    "mutation_refuted": true,
+    "mutation_strength": {
+      "diverged": 769,
+      "total": 769,
+      "fraction": 1
+    },
+    "proof_1_baseline_equals_task": "FORMAL_NO_EXPLICIT_INPUT_BOUND",
+    "proof_3_trivial_equals_task": "FORMAL_NO_EXPLICIT_INPUT_BOUND"
+  },
+  "toolchain": {
+    "solc": "0.8.35",
+    "evm_version": "osaka",
+    "optimizer_runs": 200,
+    "bytecode_hash": "none",
+    "checker": "hevm",
+    "checker_version": "0.58.0 [no git revision present]",
+    "solver": "bitwuzla",
+    "oz_version": "v5.7.0",
+    "solady_version": "v0.1.26",
+    "forge_std_version": "v1.16.2"
+  },
+  "artifacts": {
+    "repo": "https://github.com/lzmrd/whetstone",
+    "commit": "fa44bd87604846654b64f75f9a5e97fb2a9c2a88",
+    "dirty": true,
+    "patch_sha256": "7b59bd4101ca8861711d12d4a3d3b00e1a856d7545cb0b5f4cedc2c192814258",
+    "patch_source": "pragma solidity 0.8.35;\n\nerror ZeroHasNoBytes();\n\ncontract Candidate {\n    function f(uint256 x) external pure returns (uint256 r) {\n        if (x == 0) revert ZeroHasNoBytes();\n        r = 0;\n        if (x > 0xffffffffffffffffffffffffffffffff) r += 128;\n        if (x >> r > 0xffffffffffffffff) r += 64;\n        if (x >> r > 0xffffffff) r += 32;\n        if (x >> r > 0xffff) r += 16;\n        return ((r >> 3) | ((x >> r) > 0xff ? 1 : 0)) + 1;\n    }\n}"
+  },
+  "timestamp": "2026-09-08T14:57:48.985Z"
+}

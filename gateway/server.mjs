@@ -122,7 +122,27 @@ const server = createServer(async (req, res) => {
   try { paymentPayload = JSON.parse(Buffer.from(header, 'base64').toString('utf8')); }
   catch { return json(res, 400, { error: 'X-PAYMENT is not valid base64 JSON' }); }
 
-  const settled = await verifyAndSettle(paymentPayload, paymentRequirements);
+  /**
+   * ⚠️ The facilitator is a remote HTTPS service and it WILL drop connections.
+   * This call was unguarded, so a single transient ECONNRESET during settlement
+   * threw out of the request handler, took the whole gateway process down, and
+   * every subsequent run failed with "fetch failed" — which the harness then
+   * recorded as the MODEL failing. A local network blip was written to a public
+   * append-only log as five model failures. Guarded here, and attributed
+   * correctly in agent.mjs.
+   */
+  let settled;
+  try {
+    settled = await verifyAndSettle(paymentPayload, paymentRequirements);
+  } catch (e) {
+    console.log(`  ✗ facilitator unreachable: ${e.cause?.code ?? e.message}`);
+    return json(res, 502, {
+      error: 'facilitator_unreachable',
+      stage: 'settle',
+      reason: `${e.cause?.code ?? e.message}`,
+      note: 'This is an infrastructure failure on the payment rail, not a model failure. Retry.',
+    });
+  }
   if (!settled.ok) {
     console.log(`  ✗ ${settled.stage} failed: ${settled.reason}`);
     return json(res, 402, { x402Version: 2, error: `${settled.stage} failed`, reason: settled.reason });
@@ -156,6 +176,19 @@ const server = createServer(async (req, res) => {
     })).toString('base64'),
   });
   res.end(text);
+});
+
+/**
+ * ⚠️ Last line of defence. Any unhandled rejection anywhere in a handler used to
+ * terminate the process, so one bad request ended the run for all the others.
+ * Log it and keep serving: a gateway that dies quietly is worse than one that
+ * returns errors loudly.
+ */
+process.on('unhandledRejection', (e) => {
+  console.error(`\n⚠️  unhandled rejection (the gateway stays up): ${e?.stack ?? e}\n`);
+});
+process.on('uncaughtException', (e) => {
+  console.error(`\n⚠️  uncaught exception (the gateway stays up): ${e?.stack ?? e}\n`);
 });
 
 server.listen(PORT, () => {

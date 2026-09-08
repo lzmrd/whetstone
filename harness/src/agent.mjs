@@ -259,8 +259,21 @@ export async function runAgent({
     try {
       call = await callModel({ baseUrl, apiKey, model: gateway ? `${provider}/${model}` : model, messages, maxTokens, temperature, seed, log, gateway, payments: run.payments });
     } catch (e) {
-      run.rounds.push({ round, outcome: 'provider_error', detail: e.message });
-      run.stop_reason = 'provider_error';
+      /**
+       * ⚠️ ATTRIBUTION. "The model failed" and "our own plumbing failed" are
+       * different facts and only one of them belongs in a public record about
+       * models. They were conflated: when the gateway process died, five seeds
+       * failed with "fetch failed" and five rows saying the MODEL produced
+       * nothing were written to an append-only log on Base Sepolia.
+       *
+       * A local transport error — the gateway not listening, DNS, a reset
+       * socket — never reached a provider and cost nothing. It is ours.
+       */
+      const msg = `${e.message} ${e.cause?.code ?? ''}`;
+      const ours = /fetch failed|ECONNREFUSED|ECONNRESET|EAI_AGAIN|ETIMEDOUT|socket hang up|facilitator_unreachable/i
+        .test(msg);
+      run.rounds.push({ round, outcome: ours ? 'harness_error' : 'provider_error', detail: e.message });
+      run.stop_reason = ours ? 'harness_error' : 'provider_error';
       return run;
     }
 

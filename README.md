@@ -88,6 +88,35 @@ Optimizing gas with an LLM is well-trodden ground, and we are not first:
 
 ---
 
+## The loop this measures
+
+In [*A shallow dive into formal verification*](https://vitalik.eth.limo/general/2026/05/18/fv.html)
+(May 2026), Vitalik Buterin describes what he expects optimized code to become:
+not one artifact balancing readability against efficiency, but **two** — one
+written for speed, one written to be read — plus a machine-checked proof that they
+are equivalent.
+
+> "we have AI write the assembly, and then write a formal proof verifying that the
+> assembly has the desired properties. At the very least, the desired property can
+> just be perfect equivalence to an implementation optimized for readability and
+> written in some human-friendly high-level language."
+
+Yoichi Hirai calls that the final form of software development. **It is also the
+loop Whetstone runs**: the model writes the fast version, the harness proves it
+equivalent to the reference, the gas delta is the score.
+
+The post argues the loop is coming. It does not say how well models actually run
+it, what it costs, or how often the prover gives up — and those are the three
+numbers this repository reports.
+
+⚠️ **One rung down the ladder, and we say so.** That post is Lean-centric, and much
+of its value rests on the proofs being *end-to-end*. The hevm gate here is not: it
+holds within the ABI domain and the serialized wrapper assumptions, which is what
+the label `FORMAL_NO_EXPLICIT_INPUT_BOUND` is named after. Same shape, weaker
+guarantee, declared rather than implied.
+
+---
+
 ## Architecture
 
 Three environments, each with a distinct and non-overlapping role.

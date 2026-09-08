@@ -20,6 +20,8 @@ import { resolve } from './providers.mjs';
 import { buildReceipt, publishReceipt } from './receipt.mjs';
 import { loadManifest, prepareTask } from './task.mjs';
 import { requireSelfCheck } from './selfcheck.mjs';
+import { recordRun } from './registry.mjs';
+import { exportArtifacts } from './artifacts.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -99,6 +101,13 @@ for (let seed = 1; seed <= n; seed++) {
     const last = run.rounds[run.rounds.length - 1];
     console.log(`✗ ${run.stop_reason} after ${run.rounds.length} round(s)  ${(last?.detail ?? '').slice(0, 150)}`);
     results.push({ seed, ok: false, reason: run.stop_reason, rounds: run.rounds.length, usd: run.usd });
+    // ⚠️ A seed that bought inference and produced nothing is still a row: the
+    // allocator budgets across providers and money burned is money burned.
+    if (process.env.RUN_REGISTRY_ADDRESS) {
+      const failed = await buildReceipt({ run, spec, taskSource, taskPath, payments: run.payments });
+      const reg = await recordRun(failed, {});
+      if (!reg.recorded) console.log(`     ⚠️ registry: ${reg.reason}`);
+    }
     continue;
   }
   console.log(
@@ -114,6 +123,19 @@ for (let seed = 1; seed <= n; seed++) {
     const receipt = await buildReceipt({ run, spec, taskSource, taskPath, payments: run.payments });
     const ptr = await publishReceipt(receipt);
     if (!ptr.mirror.matches) console.log(`     ⚠️ receipt seq ${ptr.sequence_number} FAILED read-back`);
+    /**
+     * ⚠️ These three steps were in run.mjs and NOT here, so a batch published
+     * receipts to Hedera and wrote nothing to Base Sepolia -- the subgraph, the
+     * allocator's memory and the leaderboard would all have stayed empty while
+     * the run log said everything succeeded. Exactly the "wired in one entry
+     * point, not the other" failure this repository has already hit in the
+     * opposite direction.
+     */
+    exportArtifacts({ receipt, prepared, run });
+    const reg = await recordRun(receipt, ptr);
+    console.log(reg.recorded
+      ? `     receipt seq ${ptr.sequence_number} · registry ${reg.tx.slice(0, 12)}…`
+      : `     ⚠️ registry NOT RECORDED — ${reg.reason}`);
   }
 }
 

@@ -124,11 +124,29 @@ function queue(row, why) {
 /**
  * @returns {{recorded: boolean, tx: string|null, address: string|null, reason: string|null}}
  */
+/**
+ * ⚠️ Outcomes that are OURS, not the model's, and must never be written to a
+ * public record about models. They never reached a provider and cost nothing.
+ * The registry is append-only, so a row written by mistake cannot be taken back —
+ * which is the property that makes it worth trusting, and the reason the check
+ * belongs before the write rather than after.
+ */
+const NOT_ATTRIBUTABLE = new Set(['harness_error']);
+
 export async function recordRun(receipt, hcs = {}) {
   const address = process.env.RUN_REGISTRY_ADDRESS;
   const rpc = process.env.BASE_SEPOLIA_RPC_URL;
   const key = process.env.BASE_SEPOLIA_PRIVATE_KEY;
   const row = toRow(receipt, hcs);
+
+  if (NOT_ATTRIBUTABLE.has(row.outcome)) {
+    return {
+      recorded: false, tx: null, address: null, skipped: true,
+      reason: `outcome "${row.outcome}" is our infrastructure failing, not the model. ` +
+        `Not written: the log is append-only and a public record about models must not ` +
+        `carry our own outages.`,
+    };
+  }
 
   if (!address || !rpc || !key) {
     const reason = 'RUN_REGISTRY_ADDRESS / BASE_SEPOLIA_RPC_URL / BASE_SEPOLIA_PRIVATE_KEY not set';
