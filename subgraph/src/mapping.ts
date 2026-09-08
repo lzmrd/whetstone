@@ -24,6 +24,9 @@ export function handleRunRecorded(event: RunRecorded): void {
     model.recorder = event.params.recorder;
     model.name = event.params.model;
     model.runCount = ZERO;
+    model.attemptCount = ZERO;
+    model.failedCount = ZERO;
+    model.consecutiveFailures = ZERO;
     model.sumSavedPerCall = ZERO;
     model.sumUsdListNano = ZERO;
     model.totalSavedTotal = ZERO;
@@ -46,6 +49,8 @@ export function handleRunRecorded(event: RunRecorded): void {
   run.model = key;
   run.taskId = event.params.taskId;
   run.label = event.params.label;
+  run.scored = event.params.scored;
+  run.outcome = event.params.outcome;
   run.savedPerCall = event.params.savedPerCall;
   run.savedTotal = event.params.savedTotal;
   run.maxRegression = event.params.maxRegression;
@@ -55,9 +60,23 @@ export function handleRunRecorded(event: RunRecorded): void {
   run.timestamp = event.block.timestamp;
   run.save();
 
+  // ⚠️ Every attempt counts here, scored or not: this is what cold-start reads,
+  // and money burned on a failure is still money burned.
+  model.attemptCount = model.attemptCount.plus(ONE);
+  model.sumUsdListNano = model.sumUsdListNano.plus(event.params.usdListNano);
+
+  if (!event.params.scored) {
+    model.failedCount = model.failedCount.plus(ONE);
+    model.consecutiveFailures = model.consecutiveFailures.plus(ONE);
+    model.lastLabel = "";
+    model.lastRunAt = event.block.timestamp;
+    model.save();
+    return;
+  }
+  model.consecutiveFailures = ZERO;
+
   model.runCount = model.runCount.plus(ONE);
   model.sumSavedPerCall = model.sumSavedPerCall.plus(event.params.savedPerCall);
-  model.sumUsdListNano = model.sumUsdListNano.plus(event.params.usdListNano);
   model.totalSavedTotal = model.totalSavedTotal.plus(event.params.savedTotal);
 
   let label = event.params.label;

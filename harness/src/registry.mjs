@@ -34,7 +34,7 @@ const REPO = fileURLToPath(new URL('../../', import.meta.url));
 const PENDING = join(REPO, 'harness', '.runs', 'registry-pending.jsonl');
 
 const SIG =
-  'record((string,bytes32,string,uint64,string,string,string,int256,int256,uint256,int256,uint64))';
+  'record((string,bytes32,string,uint64,string,string,string,bool,string,int256,int256,uint256,int256,uint64))';
 
 /**
  * Receipt + HCS pointer → the twelve fields, in the struct's order.
@@ -49,6 +49,14 @@ const SIG =
  */
 export function toRow(receipt, hcs = {}) {
   const g = receipt.gas ?? {};
+  /**
+   * ⚠️ An attempt that produced no patch is still a row. It burned inference
+   * budget, and the allocator budgets across providers -- money spent for
+   * nothing is exactly what it must see. Unscored rows carry no guarantee label
+   * (there is nothing to label) and zeroed gas, so the `req` guard below applies
+   * only to rows that claim a measurement.
+   */
+  const scored = receipt.guarantee != null && receipt.gas != null;
   /**
    * ⚠️ LOUD, not zero. `saved_per_call` was absent from the receipt and the
    * first version of this mapping quietly wrote 0 for a run that saved 201 --
@@ -74,16 +82,26 @@ export function toRow(receipt, hcs = {}) {
     hcsSequence: hcs.sequence_number ?? 0,
     model: receipt.agent?.model ?? '',
     taskId: receipt.task?.id ?? '',
-    label: receipt.guarantee?.label ?? 'UNKNOWN',
+    // ⚠️ Empty, never 'UNKNOWN'. UNKNOWN is a real guarantee label meaning "the
+    // prover did not terminate on a patch we have"; a run with no patch has not
+    // earned any label at all, and conflating the two would put failed calls
+    // into the guarantee statistics.
+    label: scored ? receipt.guarantee.label : '',
+    scored,
+    // ⚠️ `stop_reason`, not `outcome`: the receipt has `outcomes` (plural, one
+    // per round) and `stop_reason` (how the run ended). Reading a field that
+    // does not exist would have written "unknown" onto every row -- the same
+    // silent-default failure that put 0 in savedPerCall.
+    outcome: receipt.agent?.stop_reason ?? 'unknown',
     // ⚠️ Read straight from the receipt, never re-derived. If it is missing the
     // row must not silently carry 0 -- that is a regression reported as a
     // perfect result.
-    savedPerCall: Math.trunc(req('saved_per_call', g.saved_per_call)),
-    savedTotal: Math.trunc(req('saved_total', g.saved_total)),
-    maxRegression: Math.trunc(req('patch_max_regression', g.patch_max_regression)),
+    savedPerCall: scored ? Math.trunc(req('saved_per_call', g.saved_per_call)) : 0,
+    savedTotal: scored ? Math.trunc(req('saved_total', g.saved_total)) : 0,
+    maxRegression: scored ? Math.trunc(req('patch_max_regression', g.patch_max_regression)) : 0,
     // Scaled by 1e4 and TRUNCATED, not rounded: a displayed number must never be
     // more favourable than the measured one.
-    relativeProgressE4: Math.trunc(req('relative_progress', g.relative_progress) * 1e4),
+    relativeProgressE4: scored ? Math.trunc(req('relative_progress', g.relative_progress) * 1e4) : 0,
     // Nanodollars. usd_list is a string in the receipt.
     usdListNano: Math.trunc(Number(receipt.cost?.usd_list ?? 0) * 1e9),
   };
@@ -93,7 +111,7 @@ function tuple(r) {
   const q = (s) => JSON.stringify(String(s));
   return `(${[
     q(r.runId), r.receiptHash, q(r.hcsTopicId), r.hcsSequence,
-    q(r.model), q(r.taskId), q(r.label),
+    q(r.model), q(r.taskId), q(r.label), r.scored, q(r.outcome),
     r.savedPerCall, r.savedTotal, r.maxRegression, r.relativeProgressE4, r.usdListNano,
   ].join(',')})`;
 }

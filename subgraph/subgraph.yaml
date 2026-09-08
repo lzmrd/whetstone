@@ -13,11 +13,17 @@ dataSources:
     network: base-sepolia
     source:
       abi: RunRegistry
-      # ⚠️ Filled by ./scripts/deploy-registry.sh, which prints both lines.
-      # startBlock must be the deploy block: indexing base-sepolia from genesis
-      # takes hours and finds nothing.
-      address: "0x0000000000000000000000000000000000000000"
-      startBlock: 0
+      # Deployed by ./scripts/deploy-registry.sh, tx
+      # 0xf12435c124981624fad4463c0751494bb98927e3602fdc90ba272ef2d91afe26
+      # ⚠️ Second deploy. The first (0xdF65df72…) had no `scored`/`outcome`
+      # fields, so a paid attempt that produced no patch could not be recorded
+      # at all -- and the allocator re-elected a permanently broken model every
+      # round because it never earned a row. Its two rows are abandoned rather
+      # than migrated: they were runs, and runs are cheap to redo.
+      # ⚠️ startBlock is the DEPLOY block, never 0: indexing base-sepolia from
+      # genesis takes hours and finds nothing.
+      address: "0x6Cc049953C21e0f23AD4a2AE791253Bb4fe18Fc0"
+      startBlock: 46552903
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -30,6 +36,6 @@ dataSources:
           file: ./abis/RunRegistry.json
       eventHandlers:
         - event: >-
-            RunRecorded(indexed address,string,bytes32,string,uint64,string,string,string,int256,int256,uint256,int256,uint64)
+            RunRecorded(indexed address,string,bytes32,string,uint64,string,string,string,bool,string,int256,int256,uint256,int256,uint64)
           handler: handleRunRecorded
       file: ./src/mapping.ts

@@ -16,7 +16,12 @@ type Run @entity(immutable: true) {
 
   model: Model!
   taskId: String!
+  "Empty when scored is false: a run with no patch has earned no guarantee."
   label: String!
+  "False when the run bought inference and produced no usable patch."
+  scored: Boolean!
+  "How the run ended: proved, fuzzed, format, provider_error, budget, refuted."
+  outcome: String!
 
   "Signed: a patch can be worse than what it replaced."
   savedPerCall: BigInt!
@@ -49,9 +54,17 @@ type Model @entity(immutable: false) {
   name: String!
   runs: [Run!]! @derivedFrom(field: "model")
 
+  "⚠️ SCORED runs only."
   runCount: BigInt!
+  "Every paid attempt, scored or not. Cold-start explores on THIS, not on runCount."
+  attemptCount: BigInt!
+  "Paid attempts that produced no usable patch."
+  failedCount: BigInt!
+  "⚠️ Consecutive failures. A model that always fails is benched instead of being explored forever."
+  consecutiveFailures: BigInt!
   "Sum of the per-call savings. Divided by runCount this is the mean the allocator ranks on."
   sumSavedPerCall: BigInt!
+  "⚠️ INCLUDES money burned on failed attempts. Spend is spend."
   sumUsdListNano: BigInt!
   "Total gas saved over the scenario, per nanodollar spent. The allocator's primary key."
   totalSavedTotal: BigInt!

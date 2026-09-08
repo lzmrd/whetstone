@@ -16,6 +16,8 @@ contract RunRegistryTest is Test {
         string model,
         string taskId,
         string label,
+        bool scored,
+        string outcome,
         int256 savedPerCall,
         int256 savedTotal,
         uint256 maxRegression,
@@ -36,6 +38,8 @@ contract RunRegistryTest is Test {
             model: "groq/openai/gpt-oss-120b",
             taskId: "log256-bytelen/v1",
             label: "FORMAL_NO_EXPLICIT_INPUT_BOUND",
+            scored: true,
+            outcome: "proved",
             savedPerCall: 201,
             savedTotal: 153984,
             maxRegression: 0,
@@ -49,7 +53,7 @@ contract RunRegistryTest is Test {
         emit RunRecorded(
             address(this), "mtsk686d-ce087545", bytes32(uint256(0xdead)), "0.0.10408009", 143,
             "groq/openai/gpt-oss-120b", "log256-bytelen/v1", "FORMAL_NO_EXPLICIT_INPUT_BOUND",
-            201, 153984, 0, 7072, 871000
+            true, "proved", 201, 153984, 0, 7072, 871000
         );
         reg.record(_run());
         assertEq(reg.total(), 1);
@@ -72,14 +76,44 @@ contract RunRegistryTest is Test {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(logs.length, 1);
 
-        (, , , , , , , int256 perCall, int256 total_, uint256 maxReg, int256 rel, ) = abi.decode(
+        (, , , , , , , , , int256 perCall, int256 total_, uint256 maxReg, int256 rel, ) = abi.decode(
             logs[0].data,
-            (string, bytes32, string, uint64, string, string, string, int256, int256, uint256, int256, uint64)
+            (string, bytes32, string, uint64, string, string, string, bool, string,
+             int256, int256, uint256, int256, uint64)
         );
         assertEq(perCall, -61);
         assertEq(total_, -46848);
         assertEq(maxReg, 215);
         assertEq(rel, -18413);
+    }
+
+    /// ⚠️ A paid attempt that produced no patch. It burns budget and must be
+    /// visible to the allocator, which is what was missing: an always-failing
+    /// model wrote no row, so it stayed "unexplored" and was re-chosen forever
+    /// while its spend stayed invisible.
+    function test_an_unscored_attempt_is_still_recorded() public {
+        RunRegistry.Run memory r = _run();
+        r.scored = false;
+        r.label = "";
+        r.outcome = "provider_error";
+        r.savedPerCall = 0;
+        r.savedTotal = 0;
+        r.relativeProgressE4 = 0;
+
+        vm.recordLogs();
+        reg.record(r);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        (, , , , , , string memory label, bool scored, string memory outcome, , , , , uint64 usd) =
+            abi.decode(
+                logs[0].data,
+                (string, bytes32, string, uint64, string, string, string, bool, string,
+                 int256, int256, uint256, int256, uint64)
+            );
+        assertEq(scored, false);
+        assertEq(label, "", "no patch means no guarantee to label");
+        assertEq(outcome, "provider_error");
+        assertGt(usd, 0, "the money was still spent");
+        assertEq(reg.total(), 1);
     }
 
     /// ⚠️ Anyone may write. That is the design (a registry only its author can

@@ -63,6 +63,16 @@
             "internalType": "string"
           },
           {
+            "name": "scored",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "outcome",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
             "name": "savedPerCall",
             "type": "int256",
             "internalType": "int256"
@@ -154,6 +164,18 @@
       },
       {
         "name": "label",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "scored",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "outcome",
         "type": "string",
         "indexed": false,
         "internalType": "string"

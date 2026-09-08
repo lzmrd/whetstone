@@ -43,7 +43,21 @@ contract RunRegistry {
         // ── what the allocator filters on ──
         string model,             // "groq/openai/gpt-oss-120b"
         string taskId,            // "log256-bytelen/v1"
-        string label,             // FORMAL_NO_EXPLICIT_INPUT_BOUND | FUZZED | UNKNOWN | ...
+        string label,             // FORMAL_NO_EXPLICIT_INPUT_BOUND | FUZZED | UNKNOWN | ""
+        // ⚠️ A PAID ATTEMPT THAT PRODUCED NOTHING IS STILL A RESULT, and it was
+        // missing. A run that burns inference budget and returns no usable patch
+        // was simply never recorded, so a budget allocator -- whose entire job is
+        // to spend well across providers -- could not see the money it had
+        // wasted, and a model that always fails stayed permanently unexplored and
+        // was re-chosen forever. Found by running it, not by reading it.
+        //
+        // `scored` false means: no patch passed the gates. `label` is then empty
+        // (there is no guarantee to label) and `outcome` says how it ended --
+        // format, provider_error, refuted, budget. The guarantee vocabulary of
+        // WHETSTONE section 7 stays closed; outcomes are a different axis and get
+        // a different field rather than a fifth label.
+        bool scored,
+        string outcome,
         // ⚠️ SIGNED. A patch can be WORSE than what it replaced; the published
         // batches contain runs at -61 gas/call. An unsigned type here would
         // silently wrap a regression into a spectacular saving.
@@ -79,6 +93,8 @@ contract RunRegistry {
         string model;
         string taskId;
         string label;
+        bool scored;
+        string outcome;
         int256 savedPerCall;
         int256 savedTotal;
         uint256 maxRegression;
@@ -100,6 +116,8 @@ contract RunRegistry {
             r.model,
             r.taskId,
             r.label,
+            r.scored,
+            r.outcome,
             r.savedPerCall,
             r.savedTotal,
             r.maxRegression,

@@ -34,10 +34,22 @@ const RR_STATE = join(REPO, 'harness', '.runs', 'round-robin.json');
 /** ⚠️ Two consecutive UNKNOWN labels and the model is set aside. R10's example policy, verbatim. */
 export const UNKNOWN_STREAK_LIMIT = 2;
 
+/**
+ * ⚠️ Two consecutive paid attempts that returned nothing usable and the model is
+ * set aside too. Without this the allocator explored forever: a model that never
+ * produces a patch never earns a scored run, so it stayed "unseen" and won the
+ * cold-start rule every single round while burning budget. Found by running the
+ * allocator against the live subgraph, not by reading the policy.
+ */
+export const FAILURE_STREAK_LIMIT = 2;
+
 export const QUERY = `query Allocator($recorder: Bytes!) {
-  models(where: { recorder: $recorder }, orderBy: runCount, orderDirection: desc, first: 50) {
+  models(where: { recorder: $recorder }, orderBy: attemptCount, orderDirection: desc, first: 50) {
     name
     runCount
+    attemptCount
+    failedCount
+    consecutiveFailures
     sumSavedPerCall
     sumUsdListNano
     totalSavedTotal
@@ -49,6 +61,33 @@ export const QUERY = `query Allocator($recorder: Bytes!) {
   }
 }`;
 
+/**
+ * ⚠️ Every field the policy reads. A field missing from the query comes back
+ * `undefined`, `Number(undefined)` is `NaN`, and every comparison against NaN is
+ * false — so a rule does not error, it silently never fires. That happened: an
+ * edit to QUERY did not apply, `consecutiveFailures` was absent, and the bench
+ * rule was dead while its tests passed on hand-written rows that had the field.
+ * The query and the policy are now checked against each other at runtime.
+ */
+const REQUIRED_FIELDS = [
+  'runCount', 'attemptCount', 'failedCount', 'consecutiveFailures',
+  'sumUsdListNano', 'totalSavedTotal', 'consecutiveUnknown',
+];
+
+export function assertComplete(rows) {
+  for (const r of rows) {
+    const missing = REQUIRED_FIELDS.filter((f) => r[f] === undefined);
+    if (missing.length > 0) {
+      throw new Error(
+        `the subgraph response is missing ${missing.join(', ')} for "${r.name}". ` +
+          `The policy reads these; absent, they read as NaN and the rules that ` +
+          `depend on them silently never fire. Fix QUERY or the schema.`,
+      );
+    }
+  }
+  return rows;
+}
+
 export async function fetchModels(url, recorder) {
   const res = await fetch(url, {
     method: 'POST',
@@ -58,7 +97,7 @@ export async function fetchModels(url, recorder) {
   if (!res.ok) throw new Error(`subgraph HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const body = await res.json();
   if (body.errors) throw new Error(`subgraph errors: ${JSON.stringify(body.errors).slice(0, 300)}`);
-  return body.data.models;
+  return assertComplete(body.data.models);
 }
 
 /** Blind rotation, persisted so it is a rotation and not a constant. */
@@ -82,20 +121,30 @@ export function decide(candidates, models) {
   const by = new Map(models.map((m) => [m.name, m]));
   const trace = [];
 
-  // 1. Cold start. A model with no history is explored before anything is ranked:
-  //    ranking on an empty record would freeze the first lucky result in place.
-  const unseen = candidates.filter((c) => !by.has(c) || Number(by.get(c).runCount) === 0);
+  // ⚠️ 1. Cold start reads ATTEMPTS, not scored runs. Reading runCount meant a
+  //    model that always failed had "no history" forever and won this rule every
+  //    round, so the loop spent repeatedly on a provider that returned nothing.
+  const unseen = candidates.filter((c) => !by.has(c) || Number(by.get(c).attemptCount) === 0);
   if (unseen.length > 0) {
-    trace.push(`${unseen.length} model(s) with no recorded run → explore before ranking`);
+    trace.push(`${unseen.length} model(s) never attempted → explore before ranking`);
     return { choice: unseen[0], rule: 'cold-start', trace };
   }
 
-  // 2. Deprioritise models the checker keeps giving up on.
-  const benched = candidates.filter(
-    (c) => Number(by.get(c).consecutiveUnknown) >= UNKNOWN_STREAK_LIMIT,
-  );
-  for (const c of benched) {
-    trace.push(`${c}: ${by.get(c).consecutiveUnknown} consecutive UNKNOWN → benched`);
+  // 2. Bench two ways: a checker that keeps giving up, and a provider that keeps
+  //    returning nothing. Different causes, same conclusion — stop paying for it.
+  const benched = [];
+  for (const c of candidates) {
+    const m = by.get(c);
+    if (Number(m.consecutiveUnknown) >= UNKNOWN_STREAK_LIMIT) {
+      benched.push(c);
+      trace.push(`${c}: ${m.consecutiveUnknown} consecutive UNKNOWN → benched`);
+    } else if (Number(m.consecutiveFailures) >= FAILURE_STREAK_LIMIT) {
+      benched.push(c);
+      trace.push(
+        `${c}: ${m.consecutiveFailures} consecutive failed attempts ` +
+          `($${(Number(m.sumUsdListNano) / 1e9).toFixed(6)} burned, ${m.runCount} scored) → benched`,
+      );
+    }
   }
   let pool = candidates.filter((c) => !benched.includes(c));
   if (pool.length === 0) {
@@ -106,7 +155,16 @@ export function decide(candidates, models) {
     pool = candidates;
   }
 
-  // 3. Rank on gas saved per nanodollar spent. ⚠️ Integer arithmetic, compared by
+  // ⚠️ 3. Models with attempts but no SCORED run cannot be ranked — there is no
+  //    numerator. They are not benched (they have not failed enough yet), so
+  //    they get another exploration turn rather than a division by nothing.
+  const unranked = pool.filter((c) => Number(by.get(c).runCount) === 0);
+  if (unranked.length > 0) {
+    trace.push(`${unranked[0]}: attempted but never scored → one more exploration turn`);
+    return { choice: unranked[0], rule: 'explore-unscored', trace };
+  }
+
+  // 4. Rank on gas saved per nanodollar spent. ⚠️ Integer arithmetic, compared by
   //    cross-multiplication: floating point here would make the decision depend
   //    on rounding, and a deterministic policy that ties differently on different
   //    machines is not deterministic.
@@ -130,7 +188,7 @@ export function decide(candidates, models) {
       ? (Number(m.totalSavedTotal) / (Number(m.sumUsdListNano) / 1e9)).toFixed(0)
       : 'n/a';
     trace.push(
-      `${c}: ${m.runCount} run(s), ${m.totalSavedTotal} gas saved, ` +
+      `${c}: ${m.runCount}/${m.attemptCount} scored, ${m.totalSavedTotal} gas saved, ` +
         `$${(Number(m.sumUsdListNano) / 1e9).toFixed(6)} spent → ${perDollar} gas/$ ` +
         `[${m.formalCount} formal, ${m.fuzzedCount} fuzzed, ${m.unknownCount} unknown]`,
     );

@@ -143,5 +143,31 @@ receipt      HCS ${ptr.topic_id} seq ${ptr.sequence_number}  (${ptr.bytes} bytes
   for (const r of run.rounds) {
     if (r.detail) console.log(`\n  round ${r.round} (${r.outcome}):\n    ${r.detail.replace(/\n/g, '\n    ')}`);
   }
+
+  /**
+   * ⚠️ A FAILED RUN IS STILL RECORDED. It bought inference and returned nothing
+   * usable, and the allocator budgets across providers — money burned for
+   * nothing is precisely what it has to see. This branch used to end here, with
+   * the consequence that a model which always failed wrote no row, stayed
+   * permanently "unexplored", and was re-chosen every round while its spend
+   * stayed invisible. Found by running the allocator against the live subgraph,
+   * where it elected the same broken model twice in a row.
+   *
+   * ⚠️ No HCS receipt and no artifact bundle: there is no patch to recompute and
+   * no guarantee to label, so publishing a canonical record would be publishing
+   * a result that does not exist. The row carries scored=false, an empty label,
+   * a zero pointer, and the cost.
+   */
+  const failed = await buildReceipt({
+    run, spec, taskSource: prepared.taskSource, taskPath,
+    payment: run.payments?.[0] ?? null, payments: run.payments,
+  });
+  const reg = await recordRun(failed, {});
+  if (reg.recorded) {
+    console.log(`\nregistry     unscored attempt recorded — ${failed.cost?.usd_list ?? '?'} USD burned`);
+    console.log(`             tx ${reg.tx}`);
+  } else {
+    console.log(`\nregistry     NOT RECORDED — ${reg.reason}`);
+  }
   console.log();
 }
