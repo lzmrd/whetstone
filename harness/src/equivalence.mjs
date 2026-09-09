@@ -92,10 +92,37 @@ export async function equivalent(fileA, fileB, sig, { timeout = 300, maxIteratio
   const plain = out.replace(ANSI, '');
 
   const partial = /partially explore/.test(plain);
-  const passed = /\[PASS\] Contracts behave/.test(plain);
-  const cex = /calldata|counterexample/i.test(plain);
+  const passed = /\[PASS\] Contracts behave equivalently/.test(plain);
 
-  if (cex) return { label: 'REFUTED', equivalent: false, output: plain };
+  /**
+   * ⚠️ Matched on hevm's own refutation markers, not on the word "calldata".
+   *
+   * This test used to be /calldata|counterexample/i AND it ran BEFORE the pass
+   * test, so any output containing that word anywhere would have been reported
+   * as a refutation -- with `equivalent: false` and an empty counterexample fed
+   * back to the model. It never fired on hevm 0.58.0, whose passing output is
+   * two lines and contains neither word; the word came from the `Calldata:`
+   * heading that hevm prints INSIDE a counterexample. A marker that happens not
+   * to appear is not the same as a correct test.
+   *
+   * The two verdicts differ by one word in hevm's own output, and the
+   * difference is load-bearing:
+   *   "Contracts do not behave equivalently"   a counterexample exists
+   *   "Contracts may not behave equivalently"  exploration was incomplete
+   */
+  const refuted = /\[FAIL\] Contracts do not behave equivalently/.test(plain)
+    || /^Not equivalent\./m.test(plain);
+
+  // Both markers at once is not a verdict this function is entitled to resolve:
+  // it means the output is not what either branch assumes, and picking one
+  // would publish a guarantee derived from a parse we know is wrong.
+  if (passed && refuted) {
+    throw new Error(
+      `hevm reported BOTH a proof and a refutation. Refusing to classify:\n${plain.slice(0, 800)}`,
+    );
+  }
+
+  if (refuted) return { label: 'REFUTED', equivalent: false, output: plain };
   if (passed && !partial) {
     return {
       label: maxIterations === -1 ? 'FORMAL_NO_EXPLICIT_INPUT_BOUND' : 'FORMAL_BOUNDED',

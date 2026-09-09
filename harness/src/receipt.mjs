@@ -76,7 +76,12 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
       seed: run.seed,
       // ⚠️ What we SENT. No provider guarantees it was honoured bit-for-bit.
       temperature: run.temperature,
-      max_rounds: 8,
+      // ⚠️ What THIS run was allowed, carried on the run itself. It was the
+      // literal 8, a second copy of INTERFACE.max_rounds: the first change to
+      // the declared interface would have published receipts describing a run
+      // that never happened. Reading the constant instead would fix the drift
+      // and still describe the constant rather than the run.
+      max_rounds: run.max_rounds ?? null,
       rounds_used: run.rounds.length,
       outcomes: run.rounds.map((r) => r.outcome),
       stop_reason: run.stop_reason,

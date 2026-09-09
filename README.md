@@ -199,7 +199,7 @@ Every model call is paid for on-chain, per call, before the response is used.
 ./scripts/bootstrap.sh   # pinned libraries + solc, hevm, bitwuzla, z3 (~60 MB)
 cd harness && npm i && npm run web   # the leaderboard, reading the live subgraph
 source .envrc.sh         # .tools and Foundry ahead of the system PATH
-forge test               # 7 tests: instrument controls, gates, gas scenario
+forge test               # instrument controls, gates, gas scenario, registry
 ./scripts/selfcheck.sh   # the gate self-check, in both directions
 ```
 
@@ -223,7 +223,7 @@ account, and `cp .env.example .env` filled in — see the comments in that file.
 
 - **Not general intelligence.** One capability, on a handful of tasks.
 - **Not a model ranking.** Too few independent tasks; ties are the normal outcome and are reported as ties.
-- **Gas savings are reported per invocation**, not as annual dollars: these are `internal` libraries that get inlined, savings depend on downstream call volume and gas price, and on L2 calldata dominates execution.
+- **Gas savings are reported per invocation**, not as annual dollars: these are `internal` libraries that get inlined, savings depend on downstream call volume and gas price, and on L2, calldata dominates execution.
 - **Not "this patch is correct".** The label states what was machine-checked and under which assumptions, and nothing beyond that. Formally verified systems have shipped bugs — CompCert did, in 2011 and again in 2022 — because the statement proven did not cover the failure.
 
 Full treatment of the limits, including Goodhart effects and contamination: [spec/DESIGN-NOTES.md](spec/DESIGN-NOTES.md).

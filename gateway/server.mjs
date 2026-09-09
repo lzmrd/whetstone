@@ -39,10 +39,28 @@ import { TABLE } from '../harness/src/providers.mjs';
 
 const PORT = Number(process.env.GATEWAY_PORT ?? 8402);
 /** Declared tariff, in tinybar. Flat part covers settlement; the rest is metered. */
+/**
+ * ⚠️ Validated at startup. `Number('abc')` is NaN, and NaN propagates silently
+ * all the way into the 402 response as `amount: "NaN"` -- a payment
+ * requirement no client can satisfy and no log explains. A tariff is the price
+ * of the service; it either parses as a non-negative integer or the gateway
+ * does not start.
+ */
+const tinybar = (envKey, fallback) => {
+  const raw = process.env[envKey];
+  if (raw === undefined || raw === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) {
+    console.error(`\n✗ ${envKey}=${JSON.stringify(raw)} is not a non-negative integer number of tinybar.\n`);
+    process.exit(1);
+  }
+  return n;
+};
+
 const TARIFF = {
-  base: Number(process.env.GATEWAY_BASE_TINYBAR ?? 10000),   // 0.0001 HBAR per request
-  perInputToken: Number(process.env.GATEWAY_IN_TINYBAR ?? 4),
-  perOutputToken: Number(process.env.GATEWAY_OUT_TINYBAR ?? 16), // output costs ~4x input, as list prices do
+  base: tinybar('GATEWAY_BASE_TINYBAR', 10000),   // 0.0001 HBAR per request
+  perInputToken: tinybar('GATEWAY_IN_TINYBAR', 4),
+  perOutputToken: tinybar('GATEWAY_OUT_TINYBAR', 16), // output costs ~4x input, as list prices do
 };
 
 /**

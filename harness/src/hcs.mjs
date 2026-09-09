@@ -129,15 +129,24 @@ export async function verifyOnMirror(topicId, sequenceNumber, expectedSha, { chu
           return { found: true, matches: false, url: first, error: `chunk ${i + 1} reports number ${msg.chunk_info.number}` };
         }
       }
-      parts.push({ content: Buffer.from(msg.message, 'base64').toString('utf8'), ts: msg.consensus_timestamp });
+      // ⚠️ Kept as BYTES. Decoding each chunk to a string here and joining the
+      // strings afterwards corrupts any multi-byte character that straddles the
+      // 1024-byte boundary: each half decodes to U+FFFD, the reassembled text
+      // differs from what was published, and its sha256 cannot match. The run
+      // would be discarded as a failed read-back after the inference was paid
+      // for. Every receipt published so far is 3-4 chunks long and happens to be
+      // pure ASCII; `patch_source` is model output, so that is luck, not a
+      // property.
+      parts.push({ bytes: Buffer.from(msg.message, 'base64'), ts: msg.consensus_timestamp });
     }
 
     if (!missing) {
       if (declaredTotal != null && declaredTotal !== chunks) {
         return { found: true, matches: false, url: first, error: `message declares ${declaredTotal} chunks, we expected ${chunks}` };
       }
-      const content = parts.map((p) => p.content).join('');
-      const got = sha256(content);
+      const raw = Buffer.concat(parts.map((p) => p.bytes));
+      const got = sha256(raw);
+      const content = raw.toString('utf8');
       return {
         found: true,
         matches: got === expectedSha,

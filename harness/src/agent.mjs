@@ -262,6 +262,7 @@ export async function runAgent({
     // would have handed every satmul reader the wrong command, and hevm would
     // have answered a question about a function that was never run.
     sig,
+    max_rounds: maxRounds,
     mutation_refuted: prepared.mutation_refuted,
     mutation_strength: prepared.mutation_strength,
     baseline_runtime: baseline.runtime,
