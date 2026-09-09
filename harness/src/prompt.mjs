@@ -29,7 +29,11 @@ import { createHash } from 'node:crypto';
 /// The anti-memorisation defence is the semantic mutation `M` and the proofs
 /// that gate it -- a memorised answer is admitted and then REJECTED, which is
 /// why the defence survives being read about.
-export const FORBIDDEN = ['openzeppelin', 'solady', 'whetstone', 'vectorized', 'mulDiv'];
+// ⚠️ 'uniswap' joined this list when the fourth task stopped being an
+// OpenZeppelin transcription. The list is a record of whose code the corpus is
+// built from, so every addition to the corpus has to be checked against it --
+// a provenance name that is not here is a leak the gate cannot see.
+export const FORBIDDEN = ['openzeppelin', 'solady', 'whetstone', 'vectorized', 'mulDiv', 'uniswap', 'v4-periphery'];
 
 export const SYSTEM_PROMPT = `You optimise Solidity functions for gas.
 

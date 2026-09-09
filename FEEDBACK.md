@@ -99,9 +99,11 @@ around it. That is false. `v4-core`'s licence is per file: **18 of its 24
 libraries are MIT** — including all the pure math, `TickMath`, `SqrtPriceMath`,
 `SwapMath`, `FullMath`, `BitMath`, `TickBitmap` — and **6 are BUSL-1.1**, all
 of them the singleton's state internals (`Pool`, `Position`, `CurrencyDelta`,
-`CurrencyReserves`, `Lock`, `NonzeroDeltaCount`). There is **no `LICENSE` file
-at the repository root**, only a `licenses/` directory holding both texts, so
-the only way to know is to open each file. We planned around a constraint that
+`CurrencyReserves`, `Lock`, `NonzeroDeltaCount`). And **`v4-core` has no
+`LICENSE` file at its repository root at all** — only a `licenses/` directory
+holding both texts, with nothing saying which applies where — so the only way to
+know is to open each file. (`v4-periphery` does have one, full MIT, which is why
+this document's subject was never in doubt.) We planned around a constraint that
 did not exist, and only found out by checking. A short table in the README
 would have saved that, and would tell anyone else building on the math that
 they can.

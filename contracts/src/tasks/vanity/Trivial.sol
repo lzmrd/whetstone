@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: MIT
+//
+// ⚠️ Contains code from Uniswap/v4-periphery (MIT), (c) 2023 Universal
+// Navigation Inc. See THIRD_PARTY_NOTICES.md at the repository root for the
+// notice that licence requires, and for exactly what was taken.
 pragma solidity 0.8.35;
 
 /// THE TRIVIAL FLOOR -- the task with one word added.

@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: MIT
+//
+// ⚠️ Written here, NOT copied from Uniswap. It implements the same behaviour as
+// their VanityAddressLib.score (with this task's tariff mutation applied). See
+// THIRD_PARTY_NOTICES.md for which files in this directory are transcriptions
+// and which are not.
 pragma solidity 0.8.35;
 
 /// THE BASELINE -- the expert implementation the denominator is built from.
