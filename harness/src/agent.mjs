@@ -257,6 +257,11 @@ export async function runAgent({
     temperature,
     seed,
     task_id: prepared.manifest.id,
+    // ⚠️ In the receipt because RECOMPUTE.md tells a third party which --sig to
+    // pass to hevm. With one task it was a constant in the template; with two it
+    // would have handed every satmul reader the wrong command, and hevm would
+    // have answered a question about a function that was never run.
+    sig,
     mutation_refuted: prepared.mutation_refuted,
     mutation_strength: prepared.mutation_strength,
     baseline_runtime: baseline.runtime,

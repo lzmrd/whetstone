@@ -31,16 +31,6 @@ function libVersion(name) {
   return existsSync(f) ? readFileSync(f, 'utf8').trim() : null;
 }
 
-/**
- * ⚠️ Read from the source of truth, not retyped. A hardcoded "boundary/v1" here
- * could drift from Scenario.sol while the digest changed underneath it, and the
- * receipt would name one scenario while reporting another's identity.
- */
-function scenarioName() {
-  const src = readFileSync(join(REPO, 'contracts/test/Scenario.sol'), 'utf8');
-  return src.match(/NAME\s*=\s*"([^"]+)"/)?.[1] ?? null;
-}
-
 const git = (args) => {
   try { return execFileSync('git', args, { encoding: 'utf8' }).trim(); }
   catch { return null; }
@@ -61,6 +51,7 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
     task: {
       id: run.task_id,
       function: taskPath,
+      sig: run.sig ?? null,
       variant_hash: sha256(taskSource),
       // ⚠️ Was `run.baseline_hash ?? null` against a run object that never set
       // it, so every published receipt carried null -- the same
@@ -70,9 +61,13 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
       // flatter or punish".
       baseline_hash: run.baseline_runtime ? sha256(run.baseline_runtime) : null,
       scenario_id: run.gas?.scenario_id ?? null,
-      // ⚠️ Read from the source of truth, not retyped. A hardcoded name here
-      // could drift from Scenario.sol while the digest kept changing underneath.
-      scenario_name: scenarioName(),
+      // ⚠️ Reported BY THE MEASUREMENT, beside the digest it belongs to. This
+      // used to be a regex over Scenario.sol, which was safe while the file
+      // held one scenario and silently wrong the moment it held two: it matched
+      // the first NAME and every run claimed "boundary/v1". A name and a digest
+      // that can disagree are two facts about one thing; they now come from the
+      // same line of output.
+      scenario_name: run.gas?.scenario_name ?? null,
       prompt_hash: run.prompt_hash,
     },
 

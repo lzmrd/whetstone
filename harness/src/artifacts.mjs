@@ -86,11 +86,11 @@ Base Sepolia. Read it with \`jq . receipt.json\`; do not reformat the file.
 | Claim | How to check it yourself |
 |---|---|
 | this bundle is the run the chains recorded | \`sha256sum receipt.json\` equals the \`receiptHash\` on Base Sepolia, and equals the sha256 of the reassembled HCS message |
-| equivalence | \`hevm equivalence --code-a-file task.runtime.hex --code-b-file patch.runtime.hex --sig 'f(uint256)' --max-iterations -1\`, with hevm ${receipt.toolchain.checker_version} |
+| equivalence | \`hevm equivalence --code-a-file task.runtime.hex --code-b-file patch.runtime.hex --sig '${receipt.task.sig}' --max-iterations -1\`, with hevm ${receipt.toolchain.checker_version} |
 | the baseline computes the task | same command on \`baseline.runtime.hex\` and \`task.runtime.hex\` — must PASS |
 | the mutation is semantic | same command on \`task.runtime.hex\` and \`original.runtime.hex\` — must REFUTE |
 | gas | \`forge test --match-contract GasScenarioTest\` after etching these two runtimes; scenario digest \`${receipt.task.scenario_id}\` |
-| the scenario is the committed one | \`keccak256(abi.encode(Scenario.inputs()))\` from \`scenario.sol\` must equal that digest |
+| the scenario is the committed one | the digest of \`${receipt.task.scenario_name}\` in \`scenario.sol\` must equal that digest |
 | the mutation is not cosmetic-in-disguise | it moves **${receipt.guarantee.mutation_strength?.diverged ?? '?'} of ${receipt.guarantee.mutation_strength?.total ?? '?'}** scenario inputs |
 | nothing was recompiled differently | solc ${receipt.toolchain.solc}, evm_version ${receipt.toolchain.evm_version}, optimizer ${receipt.toolchain.optimizer_runs} runs, \`--metadata-hash none\` |
 

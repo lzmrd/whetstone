@@ -1,0 +1,33 @@
+{
+  "_comment": "SECOND TASK. A different family from log256-bytelen: multiplication with overflow detection rather than bit-length search. It exists because a benchmark whose between-task variance is zero by construction cannot generalise, and until the instrument was extended this project could measure only one-argument functions.",
+  "id": "satmul-halved/v1",
+  "kind": "semantic",
+  "task": {
+    "path": "contracts/src/tasks/satmul/Task.sol",
+    "contract": "SatMulCandidate",
+    "sig": "f(uint256,uint256)"
+  },
+  "baseline": {
+    "path": "contracts/src/tasks/satmul/Baseline.sol",
+    "contract": "SatMulBaseline"
+  },
+  "original": {
+    "path": "contracts/src/tasks/satmul/Original.sol",
+    "contract": "SatMulOriginal"
+  },
+  "mutation": {
+    "description": "the result is HALVED -- the saturating product divided by two, rounding down",
+    "author": "the builder (lzmrd)",
+    "_author_note": "⚠️ HUMAN-CHOSEN. R2 asks that authorship be a declared fact. Five candidate mutations were presented in prose with their measured divergence over the committed scenario; the builder chose this one before any of them was written as code. The Solidity and assembly transcription is the model's. This is the first task in the repository whose difficulty was decided by a human -- see AI_USAGE.md, which says the opposite about the log256 task and says it plainly.",
+    "applied_to": ["task", "baseline"],
+    "_rejected": "Two of the five candidates were refused by proof 2b before implementation: changing only the overflow result moves 29.5% of the scenario, because only 426 of the 1444 committed pairs overflow at all. A third was rejected because it added an addition, which carries an overflow check in Solidity and none in assembly -- the asymmetry recorded in Addendum 10.",
+    "proof_1_baseline_equals_task": "must PASS",
+    "proof_2_task_differs_from_original": "must REFUTE (kind=semantic)"
+  },
+  "trivial": {
+    "path": "contracts/src/tasks/satmul/Trivial.sol",
+    "contract": "SatMulTrivial",
+    "description": "the task with a provably dead multiplication deleted -- the ternary below already discards the value it guards",
+    "proof_3_trivial_equals_task": "must PASS (if it fails the sub-expression is not dead and this reference is invalid)"
+  }
+}
