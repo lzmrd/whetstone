@@ -51,3 +51,22 @@ contract SdAbs     { function f(int256 x) external pure returns (uint256) { retu
 
 contract OzSAvg    { function f(int256 a, int256 b) external pure returns (int256) { return SignedMath.average(a, b); } }
 contract SdSAvg    { function f(int256 a, int256 b) external pure returns (int256) { return S.avg(a, b); } }
+
+// ── Mutated pairs: does the headroom SURVIVE the mutation? ────────────────
+//
+// ⚠️ Measured before choosing, not after. A mutation that flattens the expert
+// implementation's advantage leaves a target with a denominator but nothing to
+// contend for -- and on functions this small that is a live risk, since the
+// whole 59-gas gap comes from a branchless ternary versus four bytes of
+// assembly.
+contract OzMaxHalved { function f(uint256 a, uint256 b) external pure returns (uint256) { return Math.max(a, b) >> 1; } }
+contract SdMaxHalved { function f(uint256 a, uint256 b) external pure returns (uint256) { return S.max(a, b) >> 1; } }
+
+contract OzMaxCompl  { function f(uint256 a, uint256 b) external pure returns (uint256) { return Math.max(~a, ~b); } }
+contract SdMaxCompl  { function f(uint256 a, uint256 b) external pure returns (uint256) { return S.max(~a, ~b); } }
+
+contract OzMinHalved { function f(uint256 a, uint256 b) external pure returns (uint256) { return Math.min(a, b) >> 1; } }
+contract SdMinHalved { function f(uint256 a, uint256 b) external pure returns (uint256) { return S.min(a, b) >> 1; } }
+
+contract OzMinCompl  { function f(uint256 a, uint256 b) external pure returns (uint256) { return Math.min(~a, ~b); } }
+contract SdMinCompl  { function f(uint256 a, uint256 b) external pure returns (uint256) { return S.min(~a, ~b); } }

@@ -47,6 +47,28 @@ export async function differential(taskHex, patchHex, sig = 'f(uint256)') {
   } catch (e) {
     const out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
     const gate = /gate 1:/.test(out) ? 1 : /gate 2:/.test(out) ? 2 : null;
+
+    /**
+     * ⚠️ `forge` exiting non-zero is not the same as a gate firing.
+     *
+     * Everything that is not one of our two gate messages is OUR failure --
+     * a missing file, a permission foundry.toml does not grant, a compiler
+     * error, a timeout -- and it was being returned as `{passed: false}`,
+     * indistinguishable from "the patch diverges". On the patch path that
+     * publishes a model failure, on chain, for something the model did not do.
+     * It is the same misattribution `attributeFailure()` exists to prevent on
+     * the provider side, on the side nobody had looked at.
+     *
+     * Found by a demonstration of the new admission ladder: the hex files were
+     * written to /tmp, which `fs_permissions` does not allow, and the ladder
+     * reported that the task's baseline diverged.
+     */
+    if (gate === null) {
+      throw new Error(
+        `differential harness failed without either gate firing — this is our error, not a ` +
+          `divergence, and must not be attributed to the code under test:\n${out.slice(-1200)}`,
+      );
+    }
     // hevm could not give a counterexample here; the fuzzer can, and it is
     // mechanical output, so §5 allows feeding it back.
     const cex = out.match(/counterexample: (calldata=\S+ args=\[[^\]]*\])/)?.[1]

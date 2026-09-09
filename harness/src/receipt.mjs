@@ -52,6 +52,11 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
       id: run.task_id,
       function: taskPath,
       sig: run.sig ?? null,
+      // ⚠️ What the TASK's own setup earned -- proof 1 and proof 3. A run's
+      // guarantee label is clamped to this, so a reader can see the weakest
+      // link rather than inferring that the strongest one is the whole chain.
+      task_guarantee: run.task_guarantee ?? null,
+      task_fuzz_campaign: run.task_fuzz_campaign ?? null,
       variant_hash: sha256(taskSource),
       // ⚠️ Was `run.baseline_hash ?? null` against a run object that never set
       // it, so every published receipt carried null -- the same

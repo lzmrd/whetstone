@@ -12,13 +12,59 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compileToRuntime } from './compile.mjs';
 import { equivalent } from './equivalence.mjs';
-import { mutationStrength } from './differential.mjs';
+import { mutationStrength, differential, fuzzCampaign } from './differential.mjs';
 import { stripComments, assertClean } from './prompt.mjs';
 
 const REPO = fileURLToPath(new URL('../../', import.meta.url));
 
 export function loadManifest(path = process.env.TASK_MANIFEST ?? 'contracts/src/tasks/manifest.json') {
   return JSON.parse(readFileSync(join(REPO, path), 'utf8'));
+}
+
+
+/**
+ * Establish that two runtimes agree, at the STRONGEST level available.
+ *
+ * ⚠️ This exists to remove an asymmetry that was never argued for. The patch a
+ * model writes climbs a ladder: prover, then gate 1 over the committed
+ * scenario, then gate 2 over 20 001 fuzz runs, and a patch that reaches only
+ * the second rung is accepted and labelled FUZZED. The task's OWN setup had no
+ * ladder -- proof 1 and proof 3 demanded the top rung or nothing.
+ *
+ * So the project applied its weaker standard to the code it judges and its
+ * stronger one to the code it writes, and the effect was not neutral: it
+ * excluded every target where hevm does not terminate. Those are exactly the
+ * string-building functions, which carry two orders of magnitude more headroom
+ * than log256 and are the only place the four-label vocabulary could ever print
+ * a second label. A rule that quietly decides which functions exist is a claim
+ * about the world, and this one was never stated.
+ *
+ * ⚠️ What does NOT change: a proof is still a proof and evidence is still
+ * evidence. The level is recorded and travels into the receipt, and a task
+ * admitted at FUZZED CAPS every run scored on it -- no patch can be published
+ * with a guarantee stronger than the setup it rests on.
+ *
+ * @returns {{level: 'FORMAL'|'FUZZED', label: string, campaign: object|null}}
+ */
+async function establishEquivalence(aPath, bPath, sig, what) {
+  const eq = await equivalent(aPath, bPath, sig);
+  if (eq.equivalent === true) return { level: 'FORMAL', label: eq.label, campaign: null };
+  if (eq.equivalent === false) {
+    throw new Error(
+      `${what} FAILED (REFUTED): hevm found an input where they differ. This is a refutation, ` +
+        `not an inconclusive result, and no amount of fuzzing overrides it.`,
+    );
+  }
+
+  const diff = await differential(aPath, bPath, sig);
+  if (!diff.passed) {
+    throw new Error(
+      `${what} FAILED: the prover did not terminate AND gate ${diff.gate} found a divergence. ` +
+        `${diff.counterexample ?? ''}`,
+    );
+  }
+  const campaign = await fuzzCampaign();
+  return { level: 'FUZZED', label: 'FUZZED', campaign };
 }
 
 export async function prepareTask(manifest) {
@@ -45,10 +91,7 @@ export async function prepareTask(manifest) {
 
   // proof 1 — the baseline computes the task. Without it the denominator is a
   // different function and the metric is meaningless.
-  const p1 = await equivalent(baseline.path, task.path, sig);
-  if (p1.equivalent !== true) {
-    throw new Error(`proof 1 FAILED (${p1.label}): the baseline is not equivalent to the task. Do not score.`);
-  }
+  const p1 = await establishEquivalence(baseline.path, task.path, sig, 'proof 1 (baseline == task)');
 
   /**
    * proof 2 — and its expected outcome INVERTS with the kind of variant.
@@ -64,10 +107,24 @@ export async function prepareTask(manifest) {
   const kind = manifest.kind ?? 'semantic';
   const p2 = await equivalent(task.path, original.path, sig);
 
-  if (kind === 'semantic' && p2.equivalent !== false) {
+  /**
+   * ⚠️ UNKNOWN is tolerated HERE and nowhere else, and only because proof 2b
+   * below is strictly stronger than what proof 2 asks.
+   *
+   * Proof 2 is an existence claim: some input makes them differ. Proof 2b
+   * executes both on every point of the committed scenario and counts. If 2b
+   * reports half the scenario diverging, a divergent input has been exhibited
+   * -- concretely, by running them -- so the existence claim is established by
+   * a method that does not need the solver to terminate. Without this, no
+   * intractable target could ever prove its mutation semantic.
+   *
+   * ⚠️ A REFUTED proof 2 is still required to be a refutation, not a failure:
+   * `equivalent === true` here means the mutation is cosmetic and the task dies.
+   */
+  if (kind === 'semantic' && p2.equivalent === true) {
     throw new Error(
-      `proof 2 FAILED (${p2.label}): hevm did not refute task == original, so the mutation is not ` +
-        `demonstrably semantic. R4 is not satisfied. Do not score.`,
+      `proof 2 FAILED (${p2.label}): hevm PROVED task == original, so the mutation is cosmetic. ` +
+        `R4 is not satisfied. Do not score.`,
     );
   }
   if (kind === 'control' && p2.equivalent !== true) {
@@ -123,22 +180,31 @@ export async function prepareTask(manifest) {
    * were buying real behaviour, and the reference would understate every model.
    */
   let proof_3 = null;
+  let p3 = null;
   if (trivial) {
-    const p3 = await equivalent(trivial.path, task.path, sig);
-    if (p3.equivalent !== true) {
-      throw new Error(
-        `proof 3 FAILED (${p3.label}): the trivial floor is not equivalent to the task, so the ` +
-          `edit it represents changes behaviour and cannot serve as a floor.`,
-      );
-    }
+    p3 = await establishEquivalence(trivial.path, task.path, sig, 'proof 3 (trivial == task)');
     proof_3 = p3.label;
   }
+
+  /**
+   * ⚠️ The CEILING for every run scored on this task.
+   *
+   * A patch cannot carry a stronger guarantee than the setup underneath it. If
+   * the baseline was only shown equivalent to the task by fuzzing, then the
+   * denominator itself rests on evidence rather than proof, and publishing a
+   * FORMAL label beside it would overstate the weakest link while naming the
+   * strongest. `agent.mjs` clamps the run's label to this.
+   */
+  const levels = [p1.level, ...(p3 ? [p3.level] : [])];
+  const task_guarantee = levels.includes('FUZZED') ? 'FUZZED' : 'FORMAL';
 
   return {
     manifest,
     kind,
     trivial,
     proof_3,
+    task_guarantee,
+    task_fuzz_campaign: p1.campaign ?? p3?.campaign ?? null,
     taskSource,
     task,
     baseline,

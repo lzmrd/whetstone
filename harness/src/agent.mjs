@@ -45,6 +45,22 @@ export function attributeFailure(e) {
   return ours ? 'harness_error' : 'provider_error';
 }
 
+
+/**
+ * A run cannot carry a stronger guarantee than the task it was scored on.
+ *
+ * ⚠️ If the baseline was only shown equivalent to the task by fuzzing, the
+ * denominator rests on evidence rather than proof. hevm proving THIS patch
+ * equivalent to the task is a real result, but publishing FORMAL beside a
+ * fuzz-established setup would name the strongest link in a chain whose weakest
+ * one is weaker. The vocabulary is supposed to describe what a reader can rely
+ * on, and a reader relies on the whole chain.
+ */
+export function clampLabel(label, taskGuarantee) {
+  if (taskGuarantee === 'FUZZED' && label !== 'UNKNOWN') return 'FUZZED';
+  return label;
+}
+
 export const INTERFACE = {
   max_rounds: 8,
   budget_usd_per_run: 0.05,
@@ -383,7 +399,8 @@ export async function runAgent({
             `${(gas.relative_progress * 100).toFixed(1)}% of baseline` +
             (gas.beats_trivial_by != null ? `, ${gas.beats_trivial_by >= 0 ? '+' : ''}${gas.beats_trivial_by} vs the one-word edit` : ''));
           run.rounds.push({ round, outcome: 'proved', label: eq.label, gas });
-          run.patch = { source: got.source, runtime: built.runtime, path: built.path, label: eq.label };
+          const label = clampLabel(eq.label, prepared.task_guarantee);
+          run.patch = { source: got.source, runtime: built.runtime, path: built.path, label };
           run.gas = gas;
           run.stop_reason = 'proved';
           return run;

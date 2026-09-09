@@ -90,6 +90,20 @@ contract SweepGasTest is Test {
         _pair("satSub", "OzSatSub", "SdSatSub", 2);
         _pair("satMul", "OzSatMul", "SdSatMul", 2);
         console.log("");
+        console.log("== the FUZZED family: loops, buffers, no solver ==");
+        _pair("toString",      "OzStr",      "SdStr",      1);
+        _pair("toHexString",   "OzHex",      "SdHex",      1);
+        _pair("hexAddress",    "OzHexAddr",  "SdHexAddr",  1);
+        _pair("checksummed",   "OzChecksum", "SdChecksum", 1);
+        _pair("base64",        "OzB64",      "SdB64",      1);
+        _pair("base58",        "OzB58",      "SdB58",      1);
+        console.log("");
+        console.log("== does the headroom survive the mutation? ==");
+        _pair("max M1 halved",  "OzMaxHalved", "SdMaxHalved", 2);
+        _pair("max M2 compl",   "OzMaxCompl",  "SdMaxCompl",  2);
+        _pair("min M1 halved",  "OzMinHalved", "SdMinHalved", 2);
+        _pair("min M2 compl",   "OzMinCompl",  "SdMinCompl",  2);
+        console.log("");
         console.log("reference: log256 (the current task) saves 66 gas/call;");
         console.log("the trivial one-word floor on it is 69 gas/call.");
     }
