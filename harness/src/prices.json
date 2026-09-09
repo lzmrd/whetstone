@@ -93,8 +93,18 @@
       "key_env": "OPENROUTER_API_KEY",
       "source": "https://openrouter.ai/docs/guides/overview/models (catalogue), https://openrouter.ai/api/v1/models (prices)",
       "retrieved": "2026-09-09",
-      "status": "ACTIVE \u2014 4 PAID model(s) selected: open-weight only, R14 reviewers excluded. All four smoke-tested against the real key; each answered and returned token usage.",
+      "status": "ACTIVE \u2014 6 PAID model(s) selected: open-weight only, R14 reviewers excluded. All six smoke-tested against the real key; each answered and returned token usage.",
       "models": {
+        "z-ai/glm-5.2": {
+          "input": 0.28,
+          "output": 0.88,
+          "cached_read": null
+        },
+        "moonshotai/kimi-k2.7-code": {
+          "input": 0.71,
+          "output": 3.5,
+          "cached_read": null
+        },
         "deepseek/deepseek-v4-flash": {
           "input": 0.084,
           "output": 0.168,
@@ -136,7 +146,9 @@
       "_cost_reality": "Measured from the 15 receipts already published: a run costs between $0.0009 and $0.0108, median about half a cent. Every model added here is CHEAPER per token than groq/openai/gpt-oss-120b, which the project has been running since 8 Sep. A full batch of 4 tasks x 7 models x 5 seeds is well under one dollar. Money was never the binding constraint, and BUDGET_USD_MAX exists to bound a runaway loop, not to ration.",
       "_open_weight_check": "\u26a0\ufe0f Checked rather than assumed, because 'open-weight only' is a rule this project states and the provider API does not expose licences. Both additions of 9 Sep have official weight repositories from the originating organisation: Qwen/Qwen3.8-27B (apache-2.0, 6.7M downloads) and zai-org/GLM-5.3 (a custom licence, 474k downloads). The rule is about whether the weights exist outside an API, which both satisfy; it is not a claim that either licence permits redistribution, which this project never does.",
       "_rejected_9_sep": "\u26a0\ufe0f Three model families were requested for the batch and NONE of them can be scored: every qwen3.8 variant, both glm-5.3 variants and moonshotai/kimi-k3 are in RED_TEAM (providers.mjs). They reviewed this project, and their critiques shaped the specification, the gates and the task corpus, so any score they earned would be contaminated by their own influence on the benchmark. They were priced and smoke-tested before that was checked, and resolve() refused them \u2014 which is the gate working as intended: its own comment warns that 'adding a price would have silently scored a reviewer', and adding a price is exactly what happened. The entries were removed rather than left inert.",
-      "_kimi_k3_second_reason": "Independently of R14, kimi-k3 could not have run fairly at the current budget: at $3/$15 per M its worst-case round is $0.096, so $0.50 funds 5 rounds against a max_rounds of 8. It would have stopped two thirds of the way through while every other model ran to the declared limit, and the result would have read as the MODEL failing. Same defect as the $0.05 budget fixed on 9 Sep."
+      "_kimi_k3_second_reason": "Independently of R14, kimi-k3 could not have run fairly at the current budget: at $3/$15 per M its worst-case round is $0.096, so $0.50 funds 5 rounds against a max_rounds of 8. It would have stopped two thirds of the way through while every other model ran to the declared limit, and the result would have read as the MODEL failing. Same defect as the $0.05 budget fixed on 9 Sep.",
+      "_predecessors_of_reviewers": "\u26a0\ufe0f glm-5.2 and kimi-k2.7-code are the versions IMMEDIATELY BEFORE two models in RED_TEAM, and they are admitted deliberately. R14's two mechanisms both fail to reach them. The training one -- a review conversation entering the training data of a model later scored -- cannot act backwards on weights already frozen and published. The appearance one is real but is about family, not identity, and R14 names its own remedy: 'if an overlap is unavoidable, it is declared on the leaderboard row rather than left for someone to notice'. So it IS declared: these two rows must carry a note that a LATER version of the same family reviewed this specification.\nThe project already worked this way before the question was asked: groq/qwen/qwen3.6-27b has been scorable throughout while qwen3.8-27b is refused.",
+      "_qwen_stops_at_3_6": "\u26a0\ufe0f There is no admissible Qwen predecessor to ADD, and the reason is the open-weight rule rather than R14. Qwen 3.7 exists on this provider only as 'plus' and 'max', and a search of the weight repositories finds no official Qwen release for either -- one third-party fork with zero downloads. Those are API-only models. The open-weight Qwen line stops at 3.6, which is already priced under groq."
     }
   }
 }

@@ -382,14 +382,29 @@ function plot(runs) {
   reference lines are at their exact positions.</p>` : ""}`;
 }
 
+/**
+ * R14 — a model used to red-team this benchmark must not be scored by it. These
+ * two are the versions IMMEDIATELY BEFORE a reviewer, which is allowed: a review
+ * written this week cannot reach weights already frozen and published. What
+ * remains is an appearance, and R14 says an unavoidable overlap is declared on
+ * the row rather than left for a reader to notice. So it is on the row.
+ */
+const LATER_VERSION_REVIEWED = {
+  "openrouter/z-ai/glm-5.2": "GLM 5.3",
+  "openrouter/moonshotai/kimi-k2.7-code": "Kimi K3",
+};
+
 function models(ms) {
   const rows = ms.map((m) => {
+    const reviewedBy = LATER_VERSION_REVIEWED[m.name];
     const benched = Number(m.consecutiveFailures) >= 2 || Number(m.consecutiveUnknown) >= 2;
     const perDollar = Number(m.sumUsdListNano) > 0
       ? Math.round(Number(m.totalSavedTotal) / (Number(m.sumUsdListNano) / 1e9)).toLocaleString()
       : "—";
     return `<tr class="${benched ? "benched" : ""}">
-      <td>${esc(m.name)}</td>
+      <td>${esc(m.name)}${reviewedBy
+        ? ` <span class="tag no" title="${esc(reviewedBy)} was used to red-team this specification. This row is an EARLIER version, whose weights predate that review, so it is scored — and the overlap is declared here rather than left to be noticed.">later version reviewed this</span>`
+        : ""}</td>
       <td class="n">${m.runCount} of ${m.attemptCount}</td>
       <td class="n ${Number(m.totalSavedTotal) < 0 ? "loss" : Number(m.totalSavedTotal) > 0 ? "gain" : ""}">${Number(m.totalSavedTotal).toLocaleString()}</td>
       <td class="n">${usd(m.sumUsdListNano)}</td>

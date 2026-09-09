@@ -244,6 +244,33 @@ for implementation and is not on the open-weight leaderboard, so it is available
 for that role. If an overlap is unavoidable, it is declared on the leaderboard
 row rather than left for someone to notice.
 
+#### ⚠️ Annotation, 9 September — what about the version BEFORE a reviewer?
+
+Asked directly, and answered by the rule's own two mechanisms rather than by
+taste.
+
+**The training mechanism does not reach a predecessor.** The danger is a review
+conversation entering the training data of a model *later* scored. Weights that
+were frozen and published before the review existed cannot absorb it. This is
+not an argument that the risk is small; it is an argument that the channel is
+absent.
+
+**The appearance mechanism does reach it, in weakened form** — it is about the
+family, not the identity. And the rule already names the remedy for exactly
+this: the overlap is *declared on the row*. So it is. `web/index.html` marks
+`glm-5.2` and `kimi-k2.7-code` with **"later version reviewed this"**, and the
+tooltip says which version and why the row is scored anyway.
+
+**The project was already doing this before the question was asked**, which is
+the strongest evidence that it is the intended reading: `groq/qwen/qwen3.6-27b`
+has been scorable throughout, while `qwen3.8-27b` is refused by `resolve()`.
+
+⚠️ A separate rule, not R14, closed the third family. There is no admissible
+Qwen predecessor to add: Qwen 3.7 exists on the provider only as `plus` and
+`max`, and no official weight release exists for either — those are API-only
+models, and the **open-weight** rule excludes them. The open-weight Qwen line
+stops at 3.6, which was already priced.
+
 ---
 
 ## 4. Per-function pipeline
