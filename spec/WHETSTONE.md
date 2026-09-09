@@ -666,10 +666,14 @@ The prize slot costs nothing (3 are allowed, we would otherwise use 2). **The wo
 
 Minimal honest deliverable — no oversell:
 
-- [ ] Point the evaluation engine at **1-2 pure functions** from `v4-periphery` (MIT; **not** `v4-core`, restrictive licence)
-- [ ] Report absolute gas delta + guarantee label. **No relative metric** — there is no solady counterpart to build a baseline from
-- [ ] `FEEDBACK.md` on the developer experience + [feedback form](https://developers.uniswap.org/hackathon-feedback) with the link
-- [ ] README pointing at the exact contracts and lines touched
+- [x] Point the evaluation engine at pure functions from `v4-periphery` (MIT). All 20 libraries screened; one measured in full (`VanityAddressLib.score`), two assessed and declined with reasons, one not looked at — [FEEDBACK.md](../FEEDBACK.md) §2 says which is which
+- [x] Report absolute gas delta + guarantee label. **No relative metric** — the term is kept, though not for the stated reason: a baseline could be built, but it would be *ours*, so the absolute figure is the one that does not require trusting our denominator
+- [x] `FEEDBACK.md` on the developer experience — [ ] **[feedback form](https://developers.uniswap.org/hackathon-feedback) still to submit, with the link**
+- [x] README pointing at the exact contracts and lines touched
+
+⚠️ The parenthetical that used to be on the first line — "**not** `v4-core`,
+restrictive licence" — was **false**, and is corrected in the annotation on
+[D-07](DECISIONS.md): v4-core is MIT per file for all of its pure math.
 
 ⚠️ A null result is publishable if framed honestly ("we ran N functions through proof-backed gates and found no headroom"). A thin result dressed up as more is not — and the impression travels to the other two tracks, which are worth more.
 

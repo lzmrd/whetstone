@@ -8,7 +8,7 @@ It runs open-weight models on Solidity optimisation tasks, charges and records e
 
 The aim is not to crown a “best model”. It is to show the evidence a credible AI-code-optimisation result needs.
 
-⚠️ **Status — vertical slice, not a benchmark yet.** Three hand-built tasks are gated and ready; the measured results so far come from one of them, over a handful of seeds. The pipeline runs end to end. That is enough to demonstrate the method; it is not enough to rank models. A real task corpus and a statistically meaningful sample are future work.
+⚠️ **Status — vertical slice, not a benchmark yet.** Four hand-built tasks are gated and ready; the measured results so far come from one of them, over a handful of seeds. The pipeline runs end to end. That is enough to demonstrate the method; it is not enough to rank models. A real task corpus and a statistically meaningful sample are future work.
 
 Built for [ETHOnline 2026](https://ethglobal.com/events/ethonline2026), Start Fresh track.
 
@@ -95,15 +95,35 @@ The deployed `RunRegistry` is [on Base Sepolia](https://sepolia.basescan.org/add
 Two checks here exist in order to fail, because a gate that nothing ever fails is not a gate:
 
 - A deliberately **cosmetic** mutation is put through the same admission checks and is **rejected**: it changes behaviour on 1 input out of 769, where the real mutation changes all 769.
-- A **trivial floor** — the task with one word deleted, no understanding required. A patch that does not beat that floor has demonstrated nothing, whatever percentage it prints. On the first task the floor turned out to be larger than the entire gap between the two reference implementations, which is why a second and a third task exist.
+- A **trivial floor** — the task with one word deleted, no understanding required. A patch that does not beat that floor has demonstrated nothing, whatever percentage it prints. On the first task the floor turned out to be larger than the entire gap between the two reference implementations, which is why a second, a third and a fourth task exist. The fourth has a floor of 1 399 gas/call against 14 137 of headroom — 9% — and is the first target with real room between a reflex and an expert implementation.
 
 The expected result on that first task — no saving, or noise — was written into the specification **before the first measured run**. It broke: the model beat the baseline on 6 of the first 22 scored runs. The cause was the toolchain rather than the model, since some patches use an opcode that the pinned reference library predates. The prediction, its falsification and the reason are recorded in [the decision log](spec/DECISIONS.md), and the denominator was deliberately left unrepaired.
+
+## A finding outside the benchmark
+
+The fourth task was built on `VanityAddressLib.score` from Uniswap's
+v4-periphery (MIT), and building it produced something the benchmark itself
+does not need: **that function can be made 79% cheaper on a realistic workload,
+computing the same score.**
+
+| workload | current | rewritten | saving |
+|---|---:|---:|---:|
+| random addresses | 2 681 | 571 | **2 110 gas/call · 79%** |
+| addresses that score above zero | 22 330 | 1 913 | **20 417 gas/call · 91%** |
+
+The first row is the one to quote — a vanity miner feeds random candidates, and
+fifteen in sixteen take the early exit. And no contract inside v4-periphery
+calls this function: the cost falls on whoever mines hook addresses with it.
+The equivalence rests on 60 000 fuzz runs and an exhaustive pass over the
+control flow, **not** on a proof — hevm was OOM-killed at 6 GB after 18
+seconds. All of it, including the licence screen of both repositories and the
+places we were wrong, is in [FEEDBACK.md](FEEDBACK.md).
 
 ## Important limits
 
 These limits are part of the result, not footnotes.
 
-- **Not a leaderboard.** Three tasks are built, but every measured batch so far comes from one of them, and several ran fewer than the intended five seeds. Results cannot establish a model ranking, and ties are the normal outcome.
+- **Not a leaderboard.** Four tasks are built, but every measured batch so far comes from one of them, and several ran fewer than the intended five seeds. Results cannot establish a model ranking, and ties are the normal outcome.
 - **Not a general intelligence test.** This is one narrow capability: optimising small Solidity functions while respecting a specified interface.
 - **Not an economic constraint.** A run does stop when its list-price estimate reaches the declared budget, but that check compares the estimate and never what actually settled on Hedera — and the cap has never bound in practice, because a whole batch costs cents. The payment flow demonstrates per-call metering and settlement, not scarcity.
 - **Not a blanket proof of correctness.** A guarantee label describes exactly what the checker established, within its ABI domain and serialised assumptions. `UNKNOWN` means the prover did not complete, not that a patch is correct.

@@ -105,6 +105,36 @@ The risk is not the prize money: a single project is submitted to multiple track
 
 **Terms**: absolute gas delta plus guarantee label, **no relative metric** — there is no solady counterpart to build a baseline from. A null result is publishable if framed honestly.
 
+### ⚠️ Annotation, Wednesday 9 September — both halves of "why the caution" were wrong
+
+Checked rather than repeated, and neither survived.
+
+**"The periphery is not provable and has no counterpart to build a baseline
+from."** `src/libraries` holds 20 files, all MIT, of which **four have zero
+imports and expose `pure` functions**. One of them, `VanityAddressLib.score`,
+has **91% of headroom** against an expert rewrite on addresses that score, 79%
+on random ones. It is now the fourth task, with the best-shaped floor in the
+corpus: 1 399 gas/call against 14 137 of headroom, where `log256`'s floor
+*exceeds* its entire gap. The baseline is ours rather than a third party's,
+which is declared in the manifest and is why the receipt reports the absolute
+delta — the original term, kept, for a reason that turned out to be the right
+one even though the premise behind it was not.
+
+**"v4-core, restrictive licence."** False. v4-core is licensed **per file**:
+18 of its 24 libraries are MIT, including every pure-math one — `TickMath`,
+`SqrtPriceMath`, `SwapMath`, `FullMath`, `BitMath`, `TickBitmap` — and 6 are
+BUSL-1.1, all of them the singleton's state internals. The repository root has
+**no LICENSE file**, only a `licenses/` directory holding both texts. The
+licence was never the blocker for the core math. Whether that math still has
+headroom after years of hand-tuning is a different question, and one this
+project has not measured.
+
+⚠️ Both claims were written into the plan on Sunday and shaped four days of
+scope. Neither cost more than ten minutes to check. The general form of this is
+recorded in [Addendum 11a](spike/DAY1-RESULTS.md): the constraints that were
+named as binding dissolved on contact with a measurement, and the ones that
+actually bound were never named.
+
 ---
 
 ## D-08 · Environment authority split

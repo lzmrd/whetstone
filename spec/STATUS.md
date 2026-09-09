@@ -108,7 +108,7 @@ mid-week.
 | Video showing the paid request | ❌ Thursday |
 
 | The Graph | ✅ registry, subgraph, allocator. ⚠️ Start Fresh registration still to do (Friday) |
-| Uniswap | ❌ conditional, not started |
+| Uniswap | ✅ done — 4th task on `VanityAddressLib.score`, [FEEDBACK.md](../FEEDBACK.md), README section. Form still to submit |
 
 ---
 
@@ -304,6 +304,57 @@ admitted on gates 1 and 2 caps every run scored on it at `FUZZED`.
 ⚠️ **The vocabulary still prints one label.** The rule being fixed is not the
 vocabulary discriminating in production, and [WHETSTONE §7](WHETSTONE.md) says so
 until a run actually earns the second one.
+
+## ✅ Uniswap — the track that was scoped as a probable null result
+
+Built on Wednesday evening in one sitting, because the instrument already fitted:
+`VanityAddressLib.score` is one argument, and `Plan`/`GasMeter` have handled that
+since day one. What did **not** fit was the scenario, and that was the real cost.
+
+```
+proof 1  baseline == task   FUZZED     proof 2b  192/264 = 72.7%  (ceiling 74.6%)
+proof 2  task != original   by construction      proof 3  trivial == task  FUZZED
+task 15 146   baseline 1 009   trivial 13 746 gas/call
+headroom 14 137              trivial floor 1 399 = 9% of headroom
+```
+
+⚠️ **`FUZZED`, not `FORMAL`, and the reason is reproducible.** hevm 0.58.0 took
+6 GB and 2m25s of CPU in 18 seconds, then `oom-kill`. A branch per nibble across
+40 nibbles is what does it. In its place: the 264-input scenario, 60 000 fuzz
+runs across three campaigns, and an exhaustive pass over all 861 reachable
+(leading zeros, leading fours) pairs.
+
+⚠️ **The baseline is ours.** Every other task's denominator is solady's, written
+by someone with no stake in our score. There is no solady counterpart here, so
+this one was written in-house — declared in the manifest, and the reason the
+Uniswap claim is reported as an absolute delta.
+
+## ⚠️ Three claims in the plan that were false, and cost four days of scope
+
+| written on Sunday | measured on Wednesday |
+|---|---|
+| the periphery "is not provable and has no counterpart to build a baseline from" | 4 of its 20 libraries are self-contained MIT with `pure` surface; one carries 91% headroom |
+| "`v4-core`, restrictive licence" | 18 of 24 v4-core libraries are MIT, including every pure-math one. No LICENSE at the root, only `licenses/` with both |
+| the Uniswap track would most likely be a published **null result** | it is the best-shaped task in the corpus — the only one whose trivial floor does not eat the headroom |
+
+Each took under ten minutes to check. Same shape as
+[Addendum 11a](spike/DAY1-RESULTS.md): the named constraints dissolved on contact
+with a measurement, and nothing named them until something forced the check.
+
+## A scenario is not a smaller vector, it is a different one
+
+`boundary/v1` collapses to 478 distinct addresses, of which roughly five sixths
+take `score`'s early exit — a power of two has a 4 as its first nonzero nibble
+only when k ≡ 2 (mod 4). Scored there, the reading would have been mostly the
+early exit, and **proof 2b could not have reached 50% for any mutation at all**.
+`vanity/v1` (264 inputs, digest `0x2d2fcbae…`) covers what an address-scoring
+function actually branches on.
+
+⚠️ And the selection cannot come from the signature: `boundary/v1` and
+`vanity/v1` are both one-argument. A `uint256` says nothing about whether it is a
+number or a truncated address. The manifest names the scenario, `Plan` refuses a
+name it does not know, and the arity default is a separate entry point so every
+earlier run stays byte-identical — both existing digests are now asserted.
 
 ## Measured dead, so nobody re-proposes them
 

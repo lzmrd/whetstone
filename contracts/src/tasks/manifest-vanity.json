@@ -23,7 +23,8 @@
     "function": "score(address)",
     "licence": "MIT",
     "commit": "e75fd8878c70d18234cdf9d0bfeeae6e16713037",
-    "_no_imports": "The file is self-contained. Nothing from v4-core is pulled in, which matters because v4-core is BUSL-1.1 and out of scope by D-07.",
+    "_no_imports": "The file is self-contained -- zero imports -- which is what made it usable without dragging in another repository.",
+    "_licence_correction": "⚠️ D-07 and DESIGN-NOTES both say v4-core is out of scope for having a restrictive licence. That is WRONG, and checking it rather than repeating it is the only reason it was caught. v4-core's licence is PER FILE: 18 of its 24 libraries are MIT (TickMath, SqrtPriceMath, SwapMath, FullMath, BitMath, TickBitmap, LiquidityMath, UnsafeMath, SafeCast, FixedPoint96/128, ProtocolFeeLibrary, ParseBytes, Hooks, LPFeeLibrary, CustomRevert, StateLibrary, TransientStateLibrary) and 6 are BUSL-1.1, all of them the singleton's state internals (Pool, Position, CurrencyDelta, CurrencyReserves, Lock, NonzeroDeltaCount). The repository root has no LICENSE file at all, only a licenses/ directory holding both. So the licence was never the blocker for the core math; whether that math still has headroom after years of hand-tuning is a separate question, and an open one.",
     "_who_pays_this_gas": "⚠️ Nobody inside v4-periphery. The full repository tree at the pinned commit was fetched and checked: the only file referencing VanityAddressLib is its own test. It is a published utility for hook-address miners, so the saving is real but it is their consumers' cost, not Uniswap's. Any claim that omits this is oversell."
   },
   "mutation": {
