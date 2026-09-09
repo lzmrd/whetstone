@@ -34,8 +34,8 @@ export async function fuzzCampaign() {
 /**
  * @returns {{passed: boolean, gate: 1|2|null, counterexample: string|null, output: string}}
  */
-export async function differential(taskHex, patchHex) {
-  const env = { ...process.env, TASK_HEX: taskHex, PATCH_HEX: patchHex };
+export async function differential(taskHex, patchHex, sig = 'f(uint256)') {
+  const env = { ...process.env, TASK_HEX: taskHex, PATCH_HEX: patchHex, TASK_SIG: sig };
   try {
     const { stdout } = await run(
       'forge',
@@ -67,8 +67,8 @@ export async function differential(taskHex, patchHex) {
  *
  * @returns {{diverged: number, total: number, fraction: number}}
  */
-export async function mutationStrength(taskHex, originalHex) {
-  const env = { ...process.env, TASK_HEX: taskHex, ORIGINAL_HEX: originalHex };
+export async function mutationStrength(taskHex, originalHex, sig = 'f(uint256)') {
+  const env = { ...process.env, TASK_HEX: taskHex, ORIGINAL_HEX: originalHex, TASK_SIG: sig };
   const { stdout } = await run(
     'forge',
     ['test', '--match-test', 'test_mutation_strength', '-vv'],

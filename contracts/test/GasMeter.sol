@@ -40,6 +40,32 @@ library GasMeter {
         assembly { mstore(add(cd, 0x24), x) }
     }
 
+    /// Reusable 4 + 64 byte buffer for `f(uint256,uint256)`.
+    ///
+    /// ⚠️ Added so the project could hold more than one target. The single-word
+    /// buffer above was the reason `log256` was the ONLY function that could be
+    /// scored -- every other candidate that survived the prover takes two
+    /// arguments. That was a limit of the ruler being read as a limit of the
+    /// subject.
+    ///
+    /// The allocation rule is the one that matters and it is unchanged: the
+    /// buffer is built ONCE before the loop and the argument words are
+    /// overwritten in place, so nothing either contract does can move the free
+    /// memory pointer between two measurements. OrderControl.t.sol covers this
+    /// path as well as the one-word path; if it ever reports a non-zero bias,
+    /// the numbers from BOTH are void.
+    function buffer2(bytes4 sel) internal pure returns (bytes memory cd) {
+        cd = new bytes(68);
+        assembly { mstore(add(cd, 0x20), sel) }
+    }
+
+    function setArgs(bytes memory cd, uint256 x, uint256 y) internal pure {
+        assembly {
+            mstore(add(cd, 0x24), x)
+            mstore(add(cd, 0x44), y)
+        }
+    }
+
     /// Gas consumed by one staticcall to `target`. No memory is written.
     function measure(address target, bytes memory cd)
         internal view returns (bool ok, uint256 used)

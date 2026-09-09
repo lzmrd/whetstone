@@ -4,6 +4,7 @@ pragma solidity 0.8.35;
 import {Test, console} from "forge-std/Test.sol";
 import {Scenario} from "./Scenario.sol";
 import {GasMeter} from "./GasMeter.sol";
+import {Plan} from "./Plan.sol";
 
 /// Measure a model's patch against the task it was given.
 ///
@@ -15,7 +16,12 @@ import {GasMeter} from "./GasMeter.sol";
 /// Paths come from the environment because the harness drives this per run:
 ///   TASK_HEX=... PATCH_HEX=... forge test --match-contract PatchGasTest
 contract PatchGasTest is Test {
-    bytes4 constant SEL = bytes4(keccak256("f(uint256)"));
+    /// ⚠️ The target's signature is DATA, supplied by the manifest through the
+    /// environment. It was a constant, and that constant was the reason this
+    /// project could score exactly one function: every other candidate that
+    /// survived the prover takes two arguments. Defaults to the original value
+    /// so a run that does not set it measures exactly what it always measured.
+    using Plan for Plan.Spec;
     address constant TASK = address(uint160(uint256(keccak256("whetstone.task"))));
     address constant PATCH = address(uint160(uint256(keccak256("whetstone.patch"))));
 
@@ -37,8 +43,9 @@ contract PatchGasTest is Test {
         _load("TASK_HEX", TASK);
         _load("PATCH_HEX", PATCH);
 
-        uint256[] memory xs = Scenario.inputs();
-        bytes memory cd = GasMeter.buffer(SEL);
+        Plan.Spec memory plan = Plan.forSig(vm.envOr("TASK_SIG", string("f(uint256)")));
+        uint256 n = plan.xs.length;
+        bytes memory cd = plan.newBuffer();
 
         uint256 totalTask;
         uint256 totalPatch;
@@ -48,8 +55,8 @@ contract PatchGasTest is Test {
         uint256 regressed;
         uint256 maxImprovement;
 
-        for (uint256 i = 0; i < xs.length; i++) {
-            GasMeter.setArg(cd, xs[i]);
+        for (uint256 i = 0; i < n; i++) {
+            plan.setPoint(cd, i);
             (bool okT, uint256 usedT) = GasMeter.measure(TASK, cd);
             (bool okP, uint256 usedP) = GasMeter.measure(PATCH, cd);
 
@@ -76,8 +83,9 @@ contract PatchGasTest is Test {
         // The scenario's identity travels with its numbers, or a score is
         // quoted without saying what it was scored on.
         console.log("WHETSTONE_GAS scenario_digest");
-        console.logBytes32(Scenario.digest());
-        console.log("WHETSTONE_GAS scenario_inputs", xs.length);
+        console.logBytes32(plan.digest);
+        console.log("WHETSTONE_GAS scenario_name", plan.name);
+        console.log("WHETSTONE_GAS scenario_inputs", n);
         console.log("WHETSTONE_GAS scored", scored);
         console.log("WHETSTONE_GAS skipped", skipped);
         console.log("WHETSTONE_GAS total_task", totalTask);

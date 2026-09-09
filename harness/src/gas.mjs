@@ -14,13 +14,13 @@ import { fileURLToPath } from 'node:url';
 const run = promisify(execFile);
 const REPO = fileURLToPath(new URL('../../', import.meta.url));
 
-export async function measurePatch(taskHex, patchHex) {
+export async function measurePatch(taskHex, patchHex, sig = 'f(uint256)') {
   let out;
   try {
     const r = await run(
       'forge',
       ['test', '--match-contract', 'PatchGasTest', '-vv'],
-      { cwd: REPO, env: { ...process.env, TASK_HEX: taskHex, PATCH_HEX: patchHex }, maxBuffer: 32e6, timeout: 600_000 },
+      { cwd: REPO, env: { ...process.env, TASK_HEX: taskHex, PATCH_HEX: patchHex, TASK_SIG: sig }, maxBuffer: 32e6, timeout: 600_000 },
     );
     out = r.stdout;
   } catch (e) {

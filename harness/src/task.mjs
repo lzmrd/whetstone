@@ -98,7 +98,7 @@ export async function prepareTask(manifest) {
    * is the bare-revert variant, and `manifest-negative.json` runs it through this
    * function. It passes proof 2 and is refused here at 1/769.
    */
-  const strength = await mutationStrength(task.path, original.path);
+  const strength = await mutationStrength(task.path, original.path, sig);
   if (kind === 'semantic' && strength.fraction < 0.5) {
     throw new Error(
       `proof 2b FAILED: the mutation changes behaviour on only ${strength.diverged}/${strength.total} ` +

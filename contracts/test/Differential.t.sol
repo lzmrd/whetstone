@@ -3,6 +3,7 @@ pragma solidity 0.8.35;
 
 import {Test, console} from "forge-std/Test.sol";
 import {Scenario} from "./Scenario.sol";
+import {Plan} from "./Plan.sol";
 
 /// Gates 1 and 2 of §7, on a model's patch against the task it was given.
 ///
@@ -20,7 +21,18 @@ import {Scenario} from "./Scenario.sol";
 ///
 /// Runs from the harness with TASK_HEX / PATCH_HEX, like PatchGas.t.sol.
 contract DifferentialTest is Test {
-    bytes4 constant SEL = bytes4(keccak256("f(uint256)"));
+    /// ⚠️ Was a constant, and that made every gate below single-argument. The
+    /// signature travels with the run now, exactly as it does in the receipt.
+    function _plan() internal view returns (Plan.Spec memory) {
+        return Plan.forSig(vm.envOr("TASK_SIG", string("f(uint256)")));
+    }
+
+    /// Calldata for the i-th point of the committed scenario.
+    function _cdAt(Plan.Spec memory p, uint256 i) internal pure returns (bytes memory) {
+        return p.arity == 1
+            ? abi.encodeWithSelector(p.sel, p.xs[i])
+            : abi.encodeWithSelector(p.sel, p.xs[i], p.ys[i]);
+    }
     address constant TASK = address(uint160(uint256(keccak256("whetstone.task"))));
     address constant PATCH = address(uint160(uint256(keccak256("whetstone.patch"))));
     address constant ORIGINAL = address(uint160(uint256(keccak256("whetstone.original"))));
@@ -44,14 +56,13 @@ contract DifferentialTest is Test {
     }
 
     /// Both sides on one input, compared in full.
-    function _agree(uint256 x) internal view returns (bool ok, bytes memory a, bytes memory b) {
-        return _agreeOn(TASK, PATCH, x);
+    function _agree(bytes memory cd) internal view returns (bool ok, bytes memory a, bytes memory b) {
+        return _agreeOn(TASK, PATCH, cd);
     }
 
-    function _agreeOn(address l, address r, uint256 x)
+    function _agreeOn(address l, address r, bytes memory cd)
         internal view returns (bool ok, bytes memory a, bytes memory b)
     {
-        bytes memory cd = abi.encodeWithSelector(SEL, x);
         (bool okA, bytes memory retA) = l.staticcall(cd);
         (bool okB, bytes memory retB) = r.staticcall(cd);
         ok = (okA == okB) && (keccak256(retA) == keccak256(retB));
@@ -81,29 +92,29 @@ contract DifferentialTest is Test {
     /// one number, parsed by whoever knows what it should be.
     function test_mutation_strength() public view {
         if (!hasOriginal) return;
-        uint256[] memory xs = Scenario.inputs();
+        Plan.Spec memory p = _plan();
         uint256 diverged;
-        for (uint256 i = 0; i < xs.length; i++) {
-            (bool ok,,) = _agreeOn(TASK, ORIGINAL, xs[i]);
+        for (uint256 i = 0; i < p.xs.length; i++) {
+            (bool ok,,) = _agreeOn(TASK, ORIGINAL, _cdAt(p, i));
             if (!ok) diverged++;
         }
-        console.log("WHETSTONE_DIVERGENCE", diverged, xs.length);
+        console.log("WHETSTONE_DIVERGENCE", diverged, p.xs.length);
     }
 
     /// GATE 1 — known behaviour: the committed scenario, every input, full buffer.
     function test_gate1_scenario_behaviour() public view {
         if (!loaded) return;
-        uint256[] memory xs = Scenario.inputs();
-        for (uint256 i = 0; i < xs.length; i++) {
-            (bool ok, bytes memory a, bytes memory b) = _agree(xs[i]);
+        Plan.Spec memory p = _plan();
+        for (uint256 i = 0; i < p.xs.length; i++) {
+            (bool ok, bytes memory a, bytes memory b) = _agree(_cdAt(p, i));
             if (!ok) {
-                console.log("GATE1 DIVERGENCE at input:", xs[i]);
+                console.log("GATE1 DIVERGENCE at input:", p.xs[i]);
                 console.logBytes(a);
                 console.logBytes(b);
                 revert("gate 1: patch diverges from task on the committed scenario");
             }
         }
-        console.log("WHETSTONE_GATE1 inputs", xs.length);
+        console.log("WHETSTONE_GATE1 inputs", p.xs.length);
     }
 
     /// GATE 2 — differential fuzzing over the whole 256-bit domain.
@@ -132,11 +143,17 @@ contract DifferentialTest is Test {
     /// `toHexString` is where it will bite in practice: hevm does not terminate on
     /// it, so FUZZED is the strongest label available for the highest-headroom
     /// target we have.
-    function testFuzz_gate2_differential(uint256 x) public view {
+    function testFuzz_gate2_differential(uint256 x, uint256 y) public view {
         if (!loaded) return;
-        (bool ok, bytes memory a, bytes memory b) = _agree(x);
+        Plan.Spec memory p = _plan();
+        // ⚠️ The second argument is fuzzed too, or a two-argument target would
+        // be explored along one axis while the report says "the whole domain".
+        bytes memory cd = p.arity == 1
+            ? abi.encodeWithSelector(p.sel, x)
+            : abi.encodeWithSelector(p.sel, x, y);
+        (bool ok, bytes memory a, bytes memory b) = _agree(cd);
         if (!ok) {
-            console.log("GATE2 DIVERGENCE at input:", x);
+            console.log("GATE2 DIVERGENCE at input:", x, y);
             console.logBytes(a);
             console.logBytes(b);
             revert("gate 2: patch diverges from task under fuzzing");
