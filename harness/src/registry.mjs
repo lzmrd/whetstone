@@ -136,7 +136,7 @@ const NOT_ATTRIBUTABLE = new Set(['harness_error']);
 export async function recordRun(receipt, hcs = {}) {
   const address = process.env.RUN_REGISTRY_ADDRESS;
   const rpc = process.env.BASE_SEPOLIA_RPC_URL;
-  const key = process.env.BASE_SEPOLIA_PRIVATE_KEY;
+  const signer = signerArgs();
   const row = toRow(receipt, hcs);
 
   if (NOT_ATTRIBUTABLE.has(row.outcome)) {
@@ -148,8 +148,8 @@ export async function recordRun(receipt, hcs = {}) {
     };
   }
 
-  if (!address || !rpc || !key) {
-    const reason = 'RUN_REGISTRY_ADDRESS / BASE_SEPOLIA_RPC_URL / BASE_SEPOLIA_PRIVATE_KEY not set';
+  if (!address || !rpc || !signer) {
+    const reason = 'RUN_REGISTRY_ADDRESS / BASE_SEPOLIA_RPC_URL / BASE_SEPOLIA_KEYSTORE not set';
     queue(row, reason);
     return { recorded: false, tx: null, address: null, reason };
   }
@@ -157,7 +157,7 @@ export async function recordRun(receipt, hcs = {}) {
   try {
     const { stdout } = await run(
       'cast',
-      ['send', address, SIG, tuple(row), '--rpc-url', rpc, '--private-key', key, '--json'],
+      ['send', address, SIG, tuple(row), '--rpc-url', rpc, ...signer, '--json'],
       { cwd: REPO, maxBuffer: 8e6, timeout: 180_000 },
     );
     const tx = JSON.parse(stdout).transactionHash;
@@ -169,21 +169,56 @@ export async function recordRun(receipt, hcs = {}) {
   }
 }
 
+/**
+ * How this process proves it is the recorder.
+ *
+ * ⚠️ NOT `--private-key`. That put the key in the argument vector of every
+ * `cast send`, and on Linux `/proc/<pid>/cmdline` is world-readable (mode 444)
+ * while `/proc/<pid>/environ` is not (mode 400): for the few seconds of each
+ * transaction, any user on the machine could read it.
+ *
+ * What that key buys is not write access -- RunRegistry is permissionless and
+ * anyone may append -- it is IDENTITY. The subgraph groups models by recorder,
+ * so whoever holds it can write invented scores that appear to come from us,
+ * onto a log that is append-only by design and therefore not correctable.
+ *
+ * The keystore path is passed instead; the key stays encrypted on disk and the
+ * password is read from a file whose path, not whose contents, is the argument.
+ *
+ * ⚠️ Refuses to fall back. A raw key in the environment is silently accepted by
+ * `cast`, so a fallback here would mean the insecure path stays one missing
+ * variable away and nothing says so.
+ */
+function signerArgs() {
+  const keystore = process.env.BASE_SEPOLIA_KEYSTORE;
+  const passwordFile = process.env.BASE_SEPOLIA_KEYSTORE_PASSWORD_FILE;
+  if (keystore && passwordFile) return ['--keystore', keystore, '--password-file', passwordFile];
+  if (process.env.BASE_SEPOLIA_PRIVATE_KEY) {
+    throw new Error(
+      'BASE_SEPOLIA_PRIVATE_KEY is set but the keystore is not. Passing a raw key to `cast` ' +
+        'exposes it in /proc/<pid>/cmdline to every user on this machine. Run ' +
+        './scripts/keystore-import.sh, set BASE_SEPOLIA_KEYSTORE and ' +
+        'BASE_SEPOLIA_KEYSTORE_PASSWORD_FILE, and delete the raw key.',
+    );
+  }
+  return null;
+}
+
 /** Drain the queue. Anything still failing stays queued. */
 export async function retryPending() {
   if (!existsSync(PENDING)) return { attempted: 0, recorded: 0, stillPending: 0 };
   const lines = readFileSync(PENDING, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
   const address = process.env.RUN_REGISTRY_ADDRESS;
   const rpc = process.env.BASE_SEPOLIA_RPC_URL;
-  const key = process.env.BASE_SEPOLIA_PRIVATE_KEY;
-  if (!address || !rpc || !key) return { attempted: 0, recorded: 0, stillPending: lines.length };
+  const signer = signerArgs();
+  if (!address || !rpc || !signer) return { attempted: 0, recorded: 0, stillPending: lines.length };
 
   const left = [];
   let recorded = 0;
   for (const entry of lines) {
     try {
       await run('cast', ['send', address, SIG, tuple(entry.row), '--rpc-url', rpc,
-                         '--private-key', key, '--json'], { cwd: REPO, maxBuffer: 8e6, timeout: 180_000 });
+                         ...signer, '--json'], { cwd: REPO, maxBuffer: 8e6, timeout: 180_000 });
       recorded++;
     } catch (e) {
       left.push({ ...entry, why: `${e.stderr ?? e.message}`.trim().split('\n')[0] });

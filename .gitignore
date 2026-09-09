@@ -46,3 +46,7 @@ harness/.runs/
 subgraph/node_modules/
 subgraph/generated/
 subgraph/build/
+
+# encrypted signing keystore and its password — never committed
+.keys/
+.env.bak.*
