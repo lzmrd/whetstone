@@ -200,7 +200,7 @@ export async function recordRun(receipt, hcs = {}) {
       ['send', address, SIG, tuple(row), '--rpc-url', rpc, ...signer, '--async', '--json'],
       { cwd: REPO, maxBuffer: 8e6, timeout: 60_000 },
     );
-    tx = JSON.parse(stdout).transactionHash ?? String(stdout).trim();
+    tx = txHashFrom(stdout);
   } catch (e) {
     // Nothing was broadcast: no hash came back, so a retry cannot duplicate.
     const reason = `${e.stderr ?? e.message}`.trim().split('\n')[0];
@@ -219,6 +219,27 @@ export async function recordRun(receipt, hcs = {}) {
   // `retryPending` will POLL it rather than re-send.
   queue(row, `broadcast but unconfirmed after ${CONFIRM_TIMEOUT_MS / 1000}s`, tx);
   return { recorded: false, tx, address, reason: 'broadcast, awaiting confirmation' };
+}
+
+/**
+ * The transaction hash from `cast send --async`.
+ *
+ * ⚠️ `--async --json` prints a BARE HASH, not a JSON object, so
+ * `JSON.parse(stdout).transactionHash ?? stdout.trim()` throws before the
+ * fallback can run -- and the throw lands in the catch that means "nothing was
+ * broadcast", queues the row with no hash, and lets the retry send it again.
+ * That is precisely the double-write this whole change exists to close,
+ * reintroduced by the change itself. Caught by running it against Base Sepolia
+ * rather than reading it.
+ */
+export function txHashFrom(stdout) {
+  const raw = String(stdout).trim();
+  if (/^0x[0-9a-fA-F]{64}$/.test(raw)) return raw;
+  try {
+    const tx = JSON.parse(raw).transactionHash;
+    if (tx) return tx;
+  } catch { /* not JSON: fall through to the error below */ }
+  throw new Error(`cast send returned no recognisable transaction hash: ${raw.slice(0, 200)}`);
 }
 
 /** How long to wait for a receipt before parking the hash. */
@@ -320,7 +341,7 @@ export async function retryPending() {
     try {
       const { stdout } = await run('cast', ['send', address, SIG, tuple(entry.row), '--rpc-url', rpc,
                          ...signer, '--async', '--json'], { cwd: REPO, maxBuffer: 8e6, timeout: 60_000 });
-      const tx = JSON.parse(stdout).transactionHash ?? String(stdout).trim();
+      const tx = txHashFrom(stdout);
       const conf = await confirm(tx, rpc, 60_000);
       if (conf.mined && conf.ok) { recorded++; continue; }
       left.push({ ...entry, tx, why: conf.mined ? `reverted: ${tx}` : `broadcast, unconfirmed: ${tx}` });
