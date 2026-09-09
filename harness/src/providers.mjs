@@ -60,7 +60,7 @@ export function isRedTeam(spec) {
   return RED_TEAM.has(spec) || RED_TEAM.has(spec.replace(/:batch$/, ''));
 }
 
-export function resolve(spec) {
+export function resolve(spec, { gateway = process.env.GATEWAY_URL || null } = {}) {
   const { provider, model } = parseSpec(spec);
 
   // ⚠️ Before anything else. A reviewed model must not be scored even if it is
@@ -77,8 +77,27 @@ export function resolve(spec) {
     throw new Error(`unknown provider "${provider}". Known: ${Object.keys(TABLE.providers).join(', ')}`);
   }
 
-  const apiKey = process.env[p.key_env];
-  if (!apiKey) throw new Error(`${p.key_env} is not set in .env — needed for provider "${provider}"`);
+  /**
+   * ⚠️ Required only on the DIRECT path.
+   *
+   * The gateway exists so the provider key never leaves that side: the client
+   * addresses `provider/model`, pays in HBAR, and the gateway holds the key.
+   * This function demanded the key anyway, so every paid run needed a copy of
+   * the very credential the architecture is built to keep away from it. That is
+   * operational friction and, worse, a claim about the security model that the
+   * code contradicted.
+   *
+   * `apiKey` is null when a gateway is configured. `callModel` already chooses
+   * its transport from the same flag, so nothing downstream needs the key.
+   */
+  const viaGateway = Boolean(gateway);
+  const apiKey = process.env[p.key_env] ?? null;
+  if (!apiKey && !viaGateway) {
+    throw new Error(
+      `${p.key_env} is not set in .env — needed for provider "${provider}" on the direct path. ` +
+        `Set GATEWAY_URL instead to route the call through the paid gateway, which holds the key.`,
+    );
+  }
 
   // ⚠️ No price entry means no cost column for this model, and the cost column
   // is half the thesis. Refuse rather than silently report zero.

@@ -116,9 +116,14 @@ function tuple(r) {
   ].join(',')})`;
 }
 
-function queue(row, why) {
+/**
+ * @param {string|null} tx — the hash, IF the transaction was broadcast.
+ *   ⚠️ Its presence is the retry rule: a queued row that carries a hash is
+ *   already on the network and must never be re-sent, only polled.
+ */
+function queue(row, why, tx = null) {
   mkdirSync(dirname(PENDING), { recursive: true });
-  appendFileSync(PENDING, `${JSON.stringify({ row, why, at: new Date().toISOString() })}\n`);
+  appendFileSync(PENDING, `${JSON.stringify({ row, why, tx, at: new Date().toISOString() })}\n`);
 }
 
 /**
@@ -172,18 +177,72 @@ export async function recordRun(receipt, hcs = {}) {
     return { recorded: false, tx: null, address: null, reason };
   }
 
+  /**
+   * ⚠️ BROADCAST AND WAIT ARE SEPARATED, and the reason is a hole the timeout
+   * I added yesterday opened.
+   *
+   * `cast send` used to broadcast and block until the receipt arrived. With a
+   * 180-second wall clock on it, a transaction that was BROADCAST and simply
+   * slow to mine came back as a failure -- and the failure queued the row for
+   * retry. The retry re-sent it. The contract is append-only with no idempotence
+   * on runId, so one run could be counted twice in the aggregates and twice by
+   * the allocator, permanently.
+   *
+   * `--async` returns the hash the moment it is accepted by the node. From that
+   * point the transaction exists whether or not we are still watching, so the
+   * hash is the thing worth keeping: waiting for the receipt becomes a separate,
+   * repeatable question rather than the only chance to learn the answer.
+   */
+  let tx;
   try {
     const { stdout } = await run(
       'cast',
-      ['send', address, SIG, tuple(row), '--rpc-url', rpc, ...signer, '--json'],
-      { cwd: REPO, maxBuffer: 8e6, timeout: 180_000 },
+      ['send', address, SIG, tuple(row), '--rpc-url', rpc, ...signer, '--async', '--json'],
+      { cwd: REPO, maxBuffer: 8e6, timeout: 60_000 },
     );
-    const tx = JSON.parse(stdout).transactionHash;
-    return { recorded: true, tx, address, reason: null };
+    tx = JSON.parse(stdout).transactionHash ?? String(stdout).trim();
   } catch (e) {
+    // Nothing was broadcast: no hash came back, so a retry cannot duplicate.
     const reason = `${e.stderr ?? e.message}`.trim().split('\n')[0];
-    queue(row, reason);
+    queue(row, reason, null);
     return { recorded: false, tx: null, address, reason };
+  }
+
+  const conf = await confirm(tx, rpc);
+  if (conf.mined && conf.ok) return { recorded: true, tx, address, reason: null };
+  if (conf.mined && !conf.ok) {
+    // Mined and reverted. Re-sending is safe -- nothing was appended.
+    queue(row, `transaction ${tx} reverted`, null);
+    return { recorded: false, tx, address, reason: `transaction reverted` };
+  }
+  // Broadcast but not yet mined. ⚠️ The hash travels with the queued row and
+  // `retryPending` will POLL it rather than re-send.
+  queue(row, `broadcast but unconfirmed after ${CONFIRM_TIMEOUT_MS / 1000}s`, tx);
+  return { recorded: false, tx, address, reason: 'broadcast, awaiting confirmation' };
+}
+
+/** How long to wait for a receipt before parking the hash. */
+const CONFIRM_TIMEOUT_MS = 150_000;
+
+/**
+ * Was this transaction mined, and did it succeed?
+ *
+ * @returns {{mined: boolean, ok: boolean}} — `mined: false` means "not yet",
+ *   never "not ever". The distinction is the whole point: a transaction we
+ *   cannot find may still be in the mempool, and treating that as failure is
+ *   what produced the double-write in the first place.
+ */
+async function confirm(tx, rpc, timeoutMs = CONFIRM_TIMEOUT_MS) {
+  try {
+    const { stdout } = await run(
+      'cast',
+      ['receipt', tx, '--rpc-url', rpc, '--confirmations', '1', '--json'],
+      { cwd: REPO, maxBuffer: 8e6, timeout: timeoutMs },
+    );
+    const r = JSON.parse(stdout);
+    return { mined: true, ok: r.status === '0x1' || r.status === 1 || r.status === true };
+  } catch {
+    return { mined: false, ok: false };
   }
 }
 
@@ -233,15 +292,42 @@ export async function retryPending() {
 
   const left = [];
   let recorded = 0;
+  let confirmed = 0;
   for (const entry of lines) {
+    /**
+     * ⚠️ A queued row that carries a hash was BROADCAST. Re-sending it would
+     * append the same run twice to a log with no idempotence on runId, and the
+     * duplicate would count twice in every aggregate and in the allocator,
+     * permanently. So it is polled, never re-sent.
+     *
+     * A transaction that was dropped from the mempool therefore stays pending
+     * forever rather than being retried automatically. That is the safe
+     * direction on an append-only log: a row that is missing can be added by a
+     * human who has looked, a row written twice cannot be taken back.
+     */
+    if (entry.tx) {
+      const conf = await confirm(entry.tx, rpc, 30_000);
+      if (conf.mined && conf.ok) { confirmed++; continue; }
+      if (conf.mined && !conf.ok) {
+        // Reverted: nothing was appended, so re-sending is safe.
+        entry.tx = null;
+      } else {
+        left.push({ ...entry, why: `still unconfirmed: ${entry.tx}` });
+        continue;
+      }
+    }
+
     try {
-      await run('cast', ['send', address, SIG, tuple(entry.row), '--rpc-url', rpc,
-                         ...signer, '--json'], { cwd: REPO, maxBuffer: 8e6, timeout: 180_000 });
-      recorded++;
+      const { stdout } = await run('cast', ['send', address, SIG, tuple(entry.row), '--rpc-url', rpc,
+                         ...signer, '--async', '--json'], { cwd: REPO, maxBuffer: 8e6, timeout: 60_000 });
+      const tx = JSON.parse(stdout).transactionHash ?? String(stdout).trim();
+      const conf = await confirm(tx, rpc, 60_000);
+      if (conf.mined && conf.ok) { recorded++; continue; }
+      left.push({ ...entry, tx, why: conf.mined ? `reverted: ${tx}` : `broadcast, unconfirmed: ${tx}` });
     } catch (e) {
-      left.push({ ...entry, why: `${e.stderr ?? e.message}`.trim().split('\n')[0] });
+      left.push({ ...entry, tx: null, why: `${e.stderr ?? e.message}`.trim().split('\n')[0] });
     }
   }
   writeFileSync(PENDING, left.map((e) => `${JSON.stringify(e)}\n`).join(''));
-  return { attempted: lines.length, recorded, stillPending: left.length };
+  return { attempted: lines.length, recorded, confirmed, stillPending: left.length };
 }

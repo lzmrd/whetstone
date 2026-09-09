@@ -181,6 +181,35 @@ async function callModel({ baseUrl, apiKey, model, messages, maxTokens, temperat
   throw new Error(`rate limited by ${model} after 4 attempts`);
 }
 
+
+/**
+ * The most the NEXT round can cost, in USD at list price.
+ *
+ * ⚠️ This exists because the budget was not a budget. The call was made, the
+ * spend was added up, and only then was it compared to the limit -- so a run
+ * could exceed $0.05 and would simply notice afterwards. `budget_usd_per_run`
+ * was documented as a fixed parameter of the interface while being an
+ * observation about the past.
+ *
+ * The bound is only as good as its two halves, and they are not equally solid:
+ *
+ *   output  HARD. `max_tokens` is sent with every request and no provider may
+ *           exceed it, so `maxTokens * price.output` cannot be overrun.
+ *   input   ESTIMATED, and deliberately pessimistic. Three characters per
+ *           token over-counts for English and for Solidity, where the real
+ *           ratio is nearer four; over-counting spends less than allowed,
+ *           which is the direction to be wrong in.
+ *
+ * So the guarantee is "never knowingly starts a round it cannot afford", not
+ * "the arithmetic is exact". That is a weaker claim than a budget in a payment
+ * system and it is the one this function can support.
+ */
+export function worstCaseRoundUsd(messages, maxTokens, price) {
+  const chars = JSON.stringify(messages).length;
+  const inTokens = Math.ceil(chars / 3);
+  return (inTokens / 1e6) * price.input + (maxTokens / 1e6) * price.output;
+}
+
 /**
  * @returns run record: the patch if one passed the gates, plus every round's
  *   outcome, token spend, and the reason the loop stopped.
@@ -300,6 +329,22 @@ export async function runAgent({
   };
 
   for (let round = 1; round <= maxRounds; round++) {
+    /**
+     * ⚠️ PREFLIGHT. Refuse the round we cannot afford, before buying it.
+     *
+     * A round is only started if the budget can cover its worst case. On the
+     * first round this can refuse before any money moves at all, which is the
+     * correct behaviour for a budget that is too small for the task rather
+     * than a run that has drifted over it.
+     */
+    const worstCase = worstCaseRoundUsd(messages, maxTokens, price);
+    if (run.usd + worstCase > budgetUsd) {
+      log(round, 'budget', `worst case $${worstCase.toFixed(6)} would exceed the $${budgetUsd} budget ` +
+        `(spent $${run.usd.toFixed(6)}) — round not started`);
+      run.stop_reason = 'budget';
+      return run;
+    }
+
     let call;
     try {
       call = await callModel({ baseUrl, apiKey, model: gateway ? `${provider}/${model}` : model, messages, maxTokens, temperature, seed, log, gateway, payments: run.payments });
@@ -451,6 +496,11 @@ export async function runAgent({
       }
     }
 
+    // ⚠️ Kept as well as the preflight above, not replaced by it. The
+    // preflight bounds what we are willing to START; this records that the
+    // measured spend has reached the limit. They can disagree only if a
+    // provider billed more than max_tokens allows, and that disagreement is
+    // worth having a second check for.
     if (run.usd >= budgetUsd) {
       run.stop_reason = 'budget';
       return run;
