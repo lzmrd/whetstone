@@ -1,294 +1,154 @@
 # Whetstone
 
-**Making an LLM optimize gas has already been done. Measuring it with declared guarantees has not.**
+Whetstone is a small, public experiment in a difficult question:
 
-Whetstone runs open-weight models against Solidity optimization tasks, meters and settles every single inference call on-chain, and reports three things together: **how much gas was saved**, **what it cost to get there**, and **what level of correctness guarantee actually backs each patch**.
+> When an AI proposes a gas optimisation, what would make the claim “it saved gas” independently checkable?
 
-⚠️ **"On-chain budget" would be an overstatement, so it is not claimed.** Payer and
-payee are both testnet accounts of the builder: the HBAR makes a round trip. What
-the payment rail demonstrates is *metering and settlement per call*, not financial
-constraint — and the declared `budget_usd_per_run` has never actually bound a run,
-because a five-seed batch costs $0.003–0.012 in list-price terms against a $0.05 cap.
+It runs open-weight models on Solidity optimisation tasks, charges and records each inference call, checks the proposed patch against the original behaviour, measures gas under a fixed toolchain, and publishes a receipt for the run.
 
-> 🚧 **Status: the vertical slice runs end to end.** x402 challenge → settled
-> Hedera payment → inference → symbolic equivalence → gas over a fixed scenario →
-> receipt on HCS, read back and hash-checked. The semantic mutation is applied and
-> its three proof obligations are enforced before any run is scored, so receipts
-> now carry `mutation_refuted: true`. A cosmetic control task has been run against
-> it and the result is **a tie** — reported as one.
-> The `RunRegistry` is deployed on Base Sepolia, the subgraph is published and
-> indexing, and the allocator decides the next paid round from indexed data. The
-> cross-chain link is checkable by anyone: take `receiptHash` from the subgraph,
-> fetch that message from Hedera's public mirror node, hash it, compare.
-> ⚠️ Still missing: the demo video and Start Fresh registration.
-> Built for [ETHOnline 2026](https://ethglobal.com/events/ethonline2026), Start Fresh track. Solo builder.
+The aim is not to crown a “best model”. It is to show the evidence a credible AI-code-optimisation result needs.
 
----
+⚠️ **Status — vertical slice, not a benchmark yet.** Three hand-built tasks are gated and ready; the measured results so far come from one of them, over a handful of seeds. The pipeline runs end to end. That is enough to demonstrate the method; it is not enough to rank models. A real task corpus and a statistically meaningful sample are future work.
 
-## What this is trying to be
+Built for [ETHOnline 2026](https://ethglobal.com/events/ethonline2026), Start Fresh track.
 
-**Public benchmarks for LLMs decay.** Once a benchmark is public its answers are in
-the next training run, and a rising score stops being evidence of a rising
-capability. Whetstone is an attempt at a code-optimization benchmark that resists
-that, built on three properties:
+## For judges: the idea in three minutes
 
-**1. The answer cannot be memorized.** Every task is a *semantically mutated*
-variant of a well-known library function. Every model has OpenZeppelin and solady
-in its training data — so the mutation is chosen to make the memorized answer
-**wrong**, and a memorized answer is then rejected at the equivalence gate. The
-benchmark defends itself instead of relying on secrecy. (Hiding the task is not an
-option: to have a model optimize code you must send it the code, and it runs on
-the servers of the lab you would be hiding it from.)
+### The problem
 
-**2. The score is recomputed, not measured.** Gas, under a toolchain pinned in
-every receipt — not wall-clock on somebody's laptop. Publish the receipt and
-anyone can recompute the number and catch a lie.
+“An LLM made this Solidity code cheaper” is easy to claim and surprisingly hard to trust. Four questions usually remain unanswered:
 
-**3. Correctness is machine-checked, and the strength of the check is part of the
-result.** Not "the tests pass", but one of four declared labels, from a completed
-symbolic-equivalence proof down to `UNKNOWN` when the solver gives up. A gas saving
-with no guarantee attached is not a result.
+1. Did the new code preserve the intended behaviour?
+2. Is the gas number reproducible, rather than a lucky local measurement?
+3. What did the attempt cost, including failed attempts?
+4. Could the task merely reward a solution the model had already memorised?
 
-### What exists, and what does not
+Whetstone makes each answer an artifact someone else can inspect.
 
-**What exists after five days is the evaluation engine** — harness, gates,
-guarantee vocabulary, receipts, cost accounting — validated end to end on a small
-hand-built task set.
+### The loop
 
-⚠️ **What would make it an actual benchmark is scale**: hundreds of tasks mined
-from real merged optimization commits, where the baseline is the human commit
-rather than anything we wrote. That is **roadmap, not built**, it uses a different
-baseline, and results from the two are never comparable. See Track S and Track H in
-[the design notes](spec/DESIGN-NOTES.md).
+```text
+mutated Solidity task
+        ↓
+paid model call proposes a patch
+        ↓
+compile → equivalence check → fixed gas scenario
+        ↓
+receipt: patch, cost, guarantees, toolchain and result
+        ↓
+Hedera receipt + Base Sepolia index + public subgraph
+```
 
-## Declared scope — read this first
+The model may iterate using only mechanical feedback from the compiler and checker. A patch is scored only if it compiles and passes the available correctness gate.
 
-What is built this week is a **method demonstration with a leaderboard interface**.
-It is **not a ranking of models**.
+### Why mutate a known function?
 
-- **Two functions** — `log256-bytelen/v1` and `satmul-halved/v1` — with n seeds per configuration.
-- ⚠️ **`n≥5` is the declared discipline and it was not kept**: **5 of 9** batches ran n=2 or n=3. `batch.mjs` computes the median and dispersion correctly; the sample behind some of them is thinner than the rule requires.
-- With that few independent tasks you cannot rank models, and this project does not claim to. Ties are the normal outcome and are reported as ties.
-- **The question it answers**: *"what has to be true for the claim 'this model saved gas' to be checkable by somebody else?"* The answer is the rig — a mutation that makes the memorised answer wrong, gates that name the strength of their own proof, cost tied to that strength, and a receipt anyone can recompute from.
-- The question it does **not** answer: *"which model is better at optimizing Solidity?"* — too few tasks, too few seeds, and **31 of 31** scored runs have earned the same guarantee label, so the vocabulary has not yet discriminated between anything. That needs Track H.
+A public benchmark can become less informative once its answers enter training data. Whetstone starts from well-known library functions, then applies a semantic mutation: the familiar implementation is intentionally no longer correct for the task. Before a run, the harness checks that this mutation actually changes behaviour over the committed scenario.
 
-**The leaderboard is the demonstration of the rig, not the product.**
+This does not solve contamination in general. It is a concrete defence against the simplest version: returning a memorised implementation unchanged.
 
-## What holds the numbers up
+Who wrote each mutation is recorded rather than assumed: the first was written by a model at the builder's instruction, the second and third were chosen by the builder from candidates scored in advance for how much of the scenario they actually change. [AI usage](AI_USAGE.md) has the full split, including the objection that a menu assembled by a model is itself a form of authorship.
 
-The unusual parts of this repository are not on the leaderboard. They are the
-controls that let a reader decide whether any number here means anything — and
-they are the reason a null result and a broken prediction are both written down.
+### What a result means
 
-**A negative control that has to be refused.** `manifest-negative.json` is a
-deliberately cosmetic mutation: a bare `revert` bolted onto an untouched body. It
-passes the naive check — hevm refutes `task ≡ original` on one divergent input —
-and is **still rejected**, because proof 2b requires a semantic mutation to move
-≥50% of the scenario. The real mutation moves 769/769; this one moves 1/769. A
-gate is only a gate if something fails it, and this is the something.
+Each result brings three values together:
 
-**A trivial floor.** `Trivial.sol` is the task with one word deleted — no
-understanding required — and proof 3 checks that the deleted check really was
-dead. A patch that does not beat that floor has demonstrated nothing, whatever
-percentage it prints. On `log256` the floor (69 gas) **exceeds the entire
-OpenZeppelin-to-solady gap** (66), which is why 4 of 4 runs never beat it: a fact
-about the target, and the reason a second one exists.
+| Value | Meaning |
+|---|---|
+| **Gas saved** | Difference under the published Solidity compiler, EVM target and fixed input scenario. |
+| **Cost** | Tokens used × pinned public list price, separate from the Hedera payment that meters the call. |
+| **Guarantee** | The strongest check reached: formal equivalence where the solver completes, otherwise a declared fuzzing campaign; no proof is silently implied. |
 
-**A pre-registered prediction that was falsified, and recorded as such.** The
-expected outcome on `log256` — zero, or noise-level churn — was written into the
-spec *before* the first measured run. It broke: the model beat the baseline on 6
-of the first 22 scored runs, peaking at 136.7% of it. The cause was not capability
-but an opcode — 24 patches use `clz`, reachable only under `evm_version = 'osaka'`,
-which the pinned solady predates. It is written up in [D-15](spec/DECISIONS.md),
-and the denominator is deliberately **not** repaired.
+The receipt also includes the patch source, task and baseline hashes, toolchain versions, scenario identifier, payment references and repository revision. A third party can rerun the measurement instead of accepting a dashboard number on trust.
 
-**Retractions left in place.** Claims this repository once made and has since
-withdrawn stay visible with the reason attached, rather than being edited away —
-including one further up this page.
+### Has this been done before?
 
-**Who wrote the mutation is a declared fact, not an assumption.** The whole
-anti-memorisation defence rests on `M`, so its authorship is on the record.
-`log256-bytelen/v1` is **model-written** — Claude, at the builder's explicit
-instruction. `satmul-halved/v1` is **builder-chosen**, from five candidates
-presented in prose with their measured divergence *before* any was written as
-code; two were dead on arrival because proof 2b needs ≥50% of the scenario moved
-and they moved 29.5%. [AI_USAGE.md](AI_USAGE.md) carries the full split — and
-records the objection against itself, that a menu assembled by a model is already
-a form of authorship.
-
-**A clean clone reproduces the bytecode.** `scripts/bootstrap.sh`, verified from
-scratch: bootstrap → tests pass → runtime bytecode **byte-identical**. "Anyone can
-recompute this" is worth nothing if nobody else can build it.
-
-
-## Prior art
-
-Optimizing gas with an LLM is well-trodden ground, and we are not first:
+Optimising gas with an LLM has been done several times, and recently:
 
 | Work | Date | Result |
 |---|---|---|
-| [SolEval](https://arxiv.org/abs/2502.18793) | Feb 2025 | Repo-level Solidity benchmark, introduces **Gas@k** |
+| [SolEval](https://arxiv.org/abs/2502.18793) | Feb 2025 | Repo-level Solidity benchmark, introduces Gas@k |
 | [PrefGen](https://arxiv.org/abs/2506.03006) | Jun 2025 | 58.9% Gas@5 |
-| [GasAgent](https://arxiv.org/abs/2507.15761) | Jul 2025 | 82/100 contracts optimized, 9.97% average deployment saving |
-| [*RAGas: Retrieval-Augmented Gas Optimization for Smart Contracts*](https://arxiv.org/abs/2608.15857) | Aug 2026 | Up to 11%, "preserving functional equivalence" |
+| [GasAgent](https://arxiv.org/abs/2507.15761) | Jul 2025 | 82/100 contracts optimised, 9.97% average deployment saving |
+| [RAGas](https://arxiv.org/abs/2608.15857) | Aug 2026 | Up to 11%, "preserving functional equivalence" |
 
-**What Whetstone adds**: machine-checked equivalence as a *gate with a labelled guarantee*; inference **cost** tied to that guarantee; and **third-party verifiability** — published receipts, serialized toolchain, and a scenario identified by the hash of its input vector rather than by a name.
+What is added here is not a better optimiser. It is the evidence around the number: a correctness check whose strength is stated rather than implied, the cost of reaching it, and a receipt that lets someone else recompute the result instead of trusting it.
 
-⚠️ A fourth claim, *"a measurement of the price of the semantics solady dropped"*, was carried in earlier drafts and is **withdrawn**. It rested on `mulDiv`, the one target where the semantics genuinely differ, and the arithmetic there is `UNKNOWN`: the solver exhausts memory both unconditionally and on the guarded domain. A gas delta between implementations not shown to compute the same thing is not a price.
+### Why this loop is worth measuring
 
----
+In [*A shallow dive into formal verification*](https://vitalik.eth.limo/general/2026/05/18/fv.html) (May 2026), Vitalik Buterin describes where he expects optimised code to end up: not one artifact trading readability against speed, but two — a fast implementation and a readable one — plus a machine-checked proof that they are equivalent.
 
-## The loop this measures
+That is the loop Whetstone runs: the model writes the fast version, the harness proves it equivalent to the reference, and the gas difference is the score. The post argues the loop is coming. It does not say how well models actually run it, what it costs, or how often the prover gives up — and those are the three numbers this repository reports.
 
-In [*A shallow dive into formal verification*](https://vitalik.eth.limo/general/2026/05/18/fv.html)
-(May 2026), Vitalik Buterin describes what he expects optimized code to become:
-not one artifact balancing readability against efficiency, but **two** — one
-written for speed, one written to be read — plus a machine-checked proof that they
-are equivalent.
+## What is live in this repository
 
-> "we have AI write the assembly, and then write a formal proof verifying that the
-> assembly has the desired properties. At the very least, the desired property can
-> just be perfect equivalence to an implementation optimized for readability and
-> written in some human-friendly high-level language."
+- A model-agent loop with a fixed prompt, token ceiling, temperature and iteration limit.
+- A paid x402 gateway on Hedera testnet: payment is settled before the gateway calls the model provider.
+- Solidity compilation, symbolic equivalence where possible, differential fuzzing as the declared fallback, and gas measurement over a committed scenario.
+- HCS receipts that are read back and hash-checked.
+- A permissionless `RunRegistry` on Base Sepolia and a Graph subgraph used by the allocator to see prior runs.
 
-Yoichi Hirai calls that the final form of software development. **It is also the
-loop Whetstone runs**: the model writes the fast version, the harness proves it
-equivalent to the reference, the gas delta is the score.
+The deployed `RunRegistry` is [on Base Sepolia](https://sepolia.basescan.org/address/0x6Cc049953C21e0f23AD4a2AE791253Bb4fe18Fc0); the [subgraph](https://thegraph.com/studio/subgraph/whetstone) exposes its indexed rows.
 
-The post argues the loop is coming. It does not say how well models actually run
-it, what it costs, or how often the prover gives up — and those are the three
-numbers this repository reports.
+### The controls, and a prediction that broke
 
-⚠️ **One rung down the ladder, and we say so.** That post is Lean-centric, and much
-of its value rests on the proofs being *end-to-end*. The hevm gate here is not: it
-holds within the ABI domain and the serialized wrapper assumptions, which is what
-the label `FORMAL_NO_EXPLICIT_INPUT_BOUND` is named after. Same shape, weaker
-guarantee, declared rather than implied.
+Two checks here exist in order to fail, because a gate that nothing ever fails is not a gate:
 
----
+- A deliberately **cosmetic** mutation is put through the same admission checks and is **rejected**: it changes behaviour on 1 input out of 769, where the real mutation changes all 769.
+- A **trivial floor** — the task with one word deleted, no understanding required. A patch that does not beat that floor has demonstrated nothing, whatever percentage it prints. On the first task the floor turned out to be larger than the entire gap between the two reference implementations, which is why a second and a third task exist.
 
-## Architecture
+The expected result on that first task — no saving, or noise — was written into the specification **before the first measured run**. It broke: the model beat the baseline on 6 of the first 22 scored runs. The cause was the toolchain rather than the model, since some patches use an opcode that the pinned reference library predates. The prediction, its falsification and the reason are recorded in [the decision log](spec/DECISIONS.md), and the denominator was deliberately left unrepaired.
 
-Three environments, each with a distinct and non-overlapping role.
+## Important limits
 
-```
-                    ┌──────────────────────────────┐
-                    │  HARNESS + ALLOCATOR         │
-                    │  (the agent: holds wallets,  │
-                    │   decides, pays, records)    │
-                    └───┬──────────────────────┬───┘
-        queries history │                      │ pays per call (x402)
-                        │                      ▼
-                        │        ┌──────────────────────────┐
-                        │        │  our x402-gated gateway  │
-                        │        │  on Hedera testnet       │
-                        │        │  → proxies to models     │
-                        │        └───────┬──────────────────┘
-                        │                │ patch
-                        │                ▼
-                        │        ┌──────────────────────────┐
-                        │        │  RUNNER (Foundry, local) │
-                        │        │  gates 1-3 + gas         │
-                        │        └───────┬──────────────────┘
-                        │                │
-                        │                ▼
-                        │        ┌──────────────────────────┐
-                        │        │  HCS receipt (Hedera)    │  ← canonical record
-                        │        └───────┬──────────────────┘
-                        │                │ hash + pointer
-                        │                ▼
-                  ┌─────┴────────┐  ┌──────────────────────────┐
-                  │  Subgraph    │◄─┤  RunRegistry             │
-                  │ (The Graph)  │  │  (Base Sepolia)          │
-                  └──────────────┘  └──────────────────────────┘
-```
+These limits are part of the result, not footnotes.
 
-| Environment | Authoritative for |
+- **Not a leaderboard.** Three tasks are built, but every measured batch so far comes from one of them, and several ran fewer than the intended five seeds. Results cannot establish a model ranking, and ties are the normal outcome.
+- **Not a general intelligence test.** This is one narrow capability: optimising small Solidity functions while respecting a specified interface.
+- **Not an economic constraint.** A run does stop when its list-price estimate reaches the declared budget, but that check compares the estimate and never what actually settled on Hedera — and the cap has never bound in practice, because a whole batch costs cents. The payment flow demonstrates per-call metering and settlement, not scarcity.
+- **Not a blanket proof of correctness.** A guarantee label describes exactly what the checker established, within its ABI domain and serialised assumptions. `UNKNOWN` means the prover did not complete, not that a patch is correct.
+- **Not production settlement.** Payer and payee are builder-controlled Hedera testnet accounts, so the HBAR round trip demonstrates the rail rather than an economic marketplace.
+
+For the detailed limitations, including contamination and Goodhart effects, see [Design notes](spec/DESIGN-NOTES.md).
+
+## Architecture, briefly
+
+| Component | Role |
 |---|---|
-| **Pinned Foundry EVM** (local) | Gas and equivalence. **Sole authority over the score** |
-| **Hedera testnet** | x402 payments and HCS receipts |
-| **Base Sepolia** | [`RunRegistry`](https://sepolia.basescan.org/address/0x6Cc049953C21e0f23AD4a2AE791253Bb4fe18Fc0) `0x6Cc049953C21e0f23AD4a2AE791253Bb4fe18Fc0` + the [subgraph](https://thegraph.com/studio/subgraph/whetstone) |
+| Local pinned Foundry toolchain | Sole authority for equivalence and gas measurement. |
+| x402 gateway on Hedera testnet | Gates the provider API call behind an HBAR payment and returns settlement evidence. |
+| Hedera Consensus Service | Canonical, timestamped receipt storage. |
+| Base Sepolia `RunRegistry` | Append-only, indexable pointer to the HCS receipt. It verifies no benchmark claim itself. |
+| The Graph subgraph | Query layer for the allocator’s memory across rounds. |
 
-**Why three?** The Graph cannot index Hedera, and HCS is not EVM. So the canonical receipt lives on HCS, and a small event on Base Sepolia carries its hash, its HCS pointer, and the few fields the allocator filters on. Given the event you can fetch the HCS message from the mirror node and check the hashes match.
+The chains do not make an optimisation true. They make the published claim harder to quietly replace and easier to locate. Recomputing with the pinned inputs and toolchain is what tests the claim.
 
-**Why the subgraph is load-bearing**: it is the allocator's memory across rounds. Disable it and the allocator falls back to blind round-robin — the demo shows both.
-
-⚠️ That demo **illustrates the architecture; it does not prove the subgraph is
-necessary.** An allocator built to read its history from the subgraph will of
-course degrade when the subgraph is removed. Filming it is a description of the
-design, not evidence for it, and it is presented as such.
-
----
-
-## Payment flow
-
-Every model call is paid for on-chain, per call, before the response is used.
-
-```
-1. GET /supported on the Blocky402 facilitator
-     → discover the fee-payer advertised for hedera:testnet
-2. Build paymentRequirements (scheme: exact, network: hedera:testnet, asset: HBAR)
-3. The client partially signs a TransferTransaction
-4. POST /verify   → facilitator validates
-5. POST /settle   → facilitator co-signs as fee-payer, returns a transaction id
-6. The payload, base64-encoded, is presented as the X-PAYMENT header
-     to our gateway, which then proxies the inference call
-```
-
-**Two different numbers, never conflated.** `hbar_paid` is what actually moved on Hedera: the gateway meters each request as `base + estimated input tokens + declared max_tokens`, so the charge varies per call, and the 402 response carries the breakdown. ⚠️ Because x402 settles *before* the work, output is priced at the ceiling the client asked for — an upper bound that overcharges against tokens actually used.
-
-`usd_list` is the reported cost: `tokens actually used × published list price`, written into the receipt. The subscription used to fund the calls is not what is reported: the reported cost is the list-price equivalent, so the number means "what this would cost anyone", not "what we happened to pay".
-
-⚠️ **The list price is pinned by hand, not fetched.** The provider's `/v1/models` endpoint returns only `id`, `object`, `created`, `owned_by` — **no pricing**. Prices live in `harness/src/prices.json` with source URL, retrieval date, version and sha256, and that hash goes into the receipt. A model with no price entry cannot be metered and does not appear in the leaderboard.
-
----
-
-## Setup
+## Try it locally
 
 ```bash
-./scripts/bootstrap.sh   # pinned libraries + solc, hevm, bitwuzla, z3 (~60 MB)
-cd harness && npm i && npm run web   # the leaderboard, reading the live subgraph
-source .envrc.sh         # .tools and Foundry ahead of the system PATH
-forge test               # instrument controls, gates, gas scenario, registry
-./scripts/selfcheck.sh   # the gate self-check, in both directions
+./scripts/bootstrap.sh   # pinned libraries + solc, hevm, bitwuzla and z3
+source .envrc.sh         # select the project toolchain
+forge test               # Solidity controls, gates and gas scenario
+
+cd harness
+npm ci
+npm test
+npm run web              # local leaderboard, reading the live subgraph
 ```
 
-`lib/` and `.tools/` are not committed (vendored tarballs and large binaries), so
-`bootstrap.sh` is what makes a clone reproducible rather than merely readable.
-**Every version it installs is part of the claim, not packaging**: gas numbers are
-comparable only under the pinned solc, and an equivalence label only means what it
-says under the checker and solver that produced it. The four binaries are verified
-by sha256 against the exact builds that produced the published receipts, and a
-mismatch is a hard failure.
+To run a paid model call, copy `.env.example` to `.env`, fill the documented testnet credentials, start `npm run gateway`, then use `npm run agent -- <provider/model>`. See the operational runbook before publishing a result.
 
-Verified on a clean clone: bootstrap → `forge test` (7 passed) → runtime bytecode
-**byte-identical** to this repository's.
+## Read at the depth you need
 
-To run a *paid* model call as well: Foundry, Node 20+, a funded Hedera testnet
-account, and `cp .env.example .env` filled in — see the comments in that file.
-
----
-
-## What this does not measure
-
-- **Not general intelligence.** One capability, on a handful of tasks.
-- **Not a model ranking.** Too few independent tasks; ties are the normal outcome and are reported as ties.
-- **Gas savings are reported per invocation**, not as annual dollars: these are `internal` libraries that get inlined, savings depend on downstream call volume and gas price, and on L2, calldata dominates execution.
-- **Not "this patch is correct".** The label states what was machine-checked and under which assumptions, and nothing beyond that. Formally verified systems have shipped bugs — CompCert did, in 2011 and again in 2022 — because the statement proven did not cover the failure.
-
-Full treatment of the limits, including Goodhart effects and contamination: [spec/DESIGN-NOTES.md](spec/DESIGN-NOTES.md).
-
----
-
-## Documentation
-
-| File | Contents |
+| If you want to know… | Read |
 |---|---|
-| [spec/WHETSTONE.md](spec/WHETSTONE.md) | Build spec: binding decisions, pipeline, metric, gates |
-| [spec/RUNBOOK.md](spec/RUNBOOK.md) | Operational checklist, pivot gates, daily deliverables |
-| [spec/DESIGN-NOTES.md](spec/DESIGN-NOTES.md) | Rationale, rejected alternatives, limits, roadmap |
-| [spec/DECISIONS.md](spec/DECISIONS.md) | Decision log with evidence |
-| [AI_USAGE.md](AI_USAGE.md) | AI tool attribution |
+| The binding definitions of scores, guarantees and gates | [Whetstone specification](spec/WHETSTONE.md) |
+| How to reproduce or operate a run safely | [Runbook](spec/RUNBOOK.md) |
+| Why design choices were made, rejected alternatives and roadmap | [Design notes](spec/DESIGN-NOTES.md) |
+| The evidence behind corrections and changes | [Decision log](spec/DECISIONS.md) |
+| How AI tools contributed to the project | [AI usage](AI_USAGE.md) |
+
+Technical detail lives in those documents on purpose: the main README should let a blockchain-and-AI judge understand what is being demonstrated, what to believe, and what not to infer before asking them to audit the machinery.
 
 ## License
 

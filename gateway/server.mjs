@@ -70,10 +70,42 @@ const TARIFF = {
  * mean something. The estimate is returned in the 402 body so the client can see
  * exactly what it is being charged for.
  */
+/**
+ * ⚠️ The ceiling on billable output, and the reason it is enforced here.
+ *
+ * `max_tokens` arrives from whoever is paying. Unvalidated it was
+ * `Number(body.max_tokens ?? 1024)`, so a client could send a negative number
+ * and be quoted a NEGATIVE amount, a string and be quoted `NaN`, or a billion
+ * and have that number reach the provider on OUR API key. The quote is a price
+ * the payer is shown before paying; a price that is not a non-negative integer
+ * is not a price.
+ *
+ * The cap is above the interface's own 6 000-token reply ceiling with room to
+ * spare, so it never binds on a real run of this harness and always binds on
+ * something trying its luck.
+ */
+const MAX_OUTPUT_TOKENS = 32_000;
+
+/** Wall clock for the upstream call. Generous: reasoning models are slow. */
+const UPSTREAM_TIMEOUT_MS = 180_000;
+
+class BadRequest extends Error {
+  constructor(message) { super(message); this.badRequest = true; }
+}
+
 function priceFor(body) {
   const chars = JSON.stringify(body.messages ?? []).length;
   const inTokens = Math.ceil(chars / 4);
-  const outTokens = Number(body.max_tokens ?? 1024);
+
+  const raw = body.max_tokens ?? 1024;
+  const outTokens = Number(raw);
+  if (!Number.isInteger(outTokens) || outTokens < 1) {
+    throw new BadRequest(`max_tokens must be a positive integer, got ${JSON.stringify(raw)}`);
+  }
+  if (outTokens > MAX_OUTPUT_TOKENS) {
+    throw new BadRequest(`max_tokens ${outTokens} exceeds this gateway's ceiling of ${MAX_OUTPUT_TOKENS}`);
+  }
+
   const amount = TARIFF.base + inTokens * TARIFF.perInputToken + outTokens * TARIFF.perOutputToken;
   return { amount: String(amount), inTokens, outTokens };
 }
@@ -113,7 +145,7 @@ const json = (res, code, obj, headers = {}) => {
   res.end(JSON.stringify(obj));
 };
 
-const server = createServer(async (req, res) => {
+async function handle(req, res) {
   if (req.method === 'GET' && req.url === '/health') return json(res, 200, { ok: true, tariff_tinybar: TARIFF });
   if (req.method !== 'POST' || !req.url.endsWith('/chat/completions')) return json(res, 404, { error: 'not found' });
 
@@ -132,8 +164,30 @@ const server = createServer(async (req, res) => {
   const provider = TABLE.providers[providerId];
   if (!provider) return json(res, 400, { error: `unknown provider in model spec "${spec}"` });
 
+  /**
+   * ⚠️ The MODEL is checked, not only the provider.
+   *
+   * Only the provider was validated, and the model string was forwarded
+   * untouched. So anyone who could pay 0.0001 HBAR could invoke any model that
+   * key can reach -- including expensive ones this gateway has no price for and
+   * would therefore be selling below cost, on our account.
+   *
+   * The price table is the allowlist, and that is not a coincidence: a model
+   * with no pinned price cannot be metered, and something that cannot be
+   * metered must not be sold. `providers.mjs` already refuses to SCORE such a
+   * model; this refuses to serve it.
+   */
+  if (!provider.models[model]) {
+    return json(res, 400, {
+      error: `"${spec}" has no pinned price, so this gateway does not serve it`,
+      priced: Object.keys(provider.models),
+    });
+  }
+
   const feePayer = await discoverFeePayer();
-  const quote = priceFor(body);
+  let quote;
+  try { quote = priceFor(body); }
+  catch (e) { if (e.badRequest) return json(res, 400, { error: e.message }); throw e; }
   const paymentRequirements = requirements(quote.amount, PAY_TO, feePayer);
 
   // ── 1. the challenge ────────────────────────────────────────────────
@@ -193,11 +247,38 @@ const server = createServer(async (req, res) => {
   const key = process.env[provider.key_env];
   if (!key) return json(res, 500, { error: `${provider.key_env} not set on the gateway` });
 
-  const upstream = await fetch(`${provider.base_url}/chat/completions`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...body, model }),
-  });
+  /**
+   * ⚠️ Bounded, and the bound matters more here than anywhere else in this
+   * file: the payment has ALREADY SETTLED by the time this runs. An upstream
+   * that accepts the connection and never answers left the client hanging
+   * indefinitely on a request it had paid for, with no error and no refund.
+   *
+   * A 502 does not give the money back either -- that is honest metering of a
+   * call we made on their behalf -- but it ends the request, says what
+   * happened, and carries the settlement id so the payer can see what they
+   * bought. Silence is the only option here that is worse than a failure.
+   */
+  let upstream;
+  try {
+    upstream = await fetch(`${provider.base_url}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, model }),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+  } catch (e) {
+    const timedOut = e?.name === 'TimeoutError' || e?.name === 'AbortError';
+    console.error(`  ✗ upstream ${timedOut ? 'timed out' : 'failed'} AFTER settlement: ${e?.message ?? e}`);
+    return json(res, 502, {
+      error: timedOut
+        ? `upstream did not answer within ${UPSTREAM_TIMEOUT_MS / 1000}s`
+        : `upstream request failed: ${e?.message ?? e}`,
+      // ⚠️ The payment happened. Say so rather than letting it look free.
+      payment_settled: true,
+      transaction: settled.transaction_id,
+      amount_tinybar: quote.amount,
+    });
+  }
 
   const text = await upstream.text();
   res.writeHead(upstream.status, {
@@ -213,6 +294,24 @@ const server = createServer(async (req, res) => {
     })).toString('base64'),
   });
   res.end(text);
+}
+
+/**
+ * ⚠️ Every request is caught HERE, not by the process-wide handlers below.
+ *
+ * An unexpected throw inside `handle` used to reach `unhandledRejection`, which
+ * logs and keeps the process alive -- while the client that triggered it waits
+ * forever on a socket nobody will ever write to. Those handlers exist so one
+ * bad request cannot take the gateway down mid-batch; they were never a way to
+ * ANSWER the request. A supervisor restarting a process it believes to be
+ * healthy is a different problem from a caller hanging on a paid call.
+ */
+const server = createServer((req, res) => {
+  handle(req, res).catch((e) => {
+    console.error(`  ✗ unhandled error in request: ${e?.stack ?? e}`);
+    if (res.headersSent) return res.end();
+    json(res, 502, { error: 'gateway failed while handling this request' });
+  });
 });
 
 /**
