@@ -710,3 +710,69 @@ equivocation on the word.
 as [Addendum 4](#) and [Addendum 8](#) — with the difference that this retraction
 removes a *favourable* reading rather than an unfavourable result, which is the
 asymmetry [D-15](../DECISIONS.md) exists to name.
+
+---
+
+# Addendum 11 — the candidate funnel was never measured, and it was not 1-in-7
+
+The scope cut to one function ([D-11](../DECISIONS.md)) rested on the day-1
+trilemma table: seven candidates, one usable. That table was read for two days as
+*"symbolic tractability is the binding constraint"*. It was a **hand-picked
+sample**, and it over-sampled hard functions — `mulDiv`, `sqrt`, and two string
+builders. Nobody enumerated the arithmetic surface the two libraries actually
+share.
+
+Enumerated now — `contracts/src/spike/SweepProbes.sol`, eleven untested pairs:
+
+| Pair | hevm | solady saves, gas/call |
+|---|---|---|
+| `clz` | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | **240** |
+| `saturatingMul` | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | **173** |
+| `max` | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | 59 |
+| `min` | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | 59 |
+| `saturatingAdd` | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | 34 |
+| `saturatingSub` | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | 3 |
+| `average` | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | 2 |
+| `abs` | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | **0** |
+| `ceilDiv` | **REFUTED** | — |
+| signed `average` | **REFUTED** | — |
+| `invMod` | no verdict (loops) | — |
+
+**Eight of eleven are provable.** The prover was never the constraint; the sample
+was. Reference: `log256`, the task in production, has a 66 gas/call gap.
+
+Two by-products worth keeping. `ceilDiv` and signed `average` are **genuinely
+refuted** — OpenZeppelin and solady agree everywhere the sweep looked except
+there, which is a real behavioural difference between two widely-used libraries
+and a demonstration that the gate discriminates on unfamiliar inputs. And `abs`
+measures **0**: two independent implementations compiling to the same cost.
+
+## ⚠️ `clz` has the most headroom and is disqualified
+
+It was the obvious pick — 240 gas/call, one argument, so the committed scenario,
+the instrument and every gate would have worked unchanged. Measured before
+writing the mutation:
+
+| Comparison | Verdict | Gas/call |
+|---|---|---|
+| `CLZ` opcode ≡ the whole OZ function | `FORMAL_NO_EXPLICIT_INPUT_BOUND` | — |
+| `CLZ` opcode vs OZ | — | **391 saved** |
+| `CLZ` opcode vs solady | — | **151 better than the expert baseline** |
+
+`foundry.toml` pins `evm_version = 'osaka'`, so a model that emits one
+instruction scores **163% of the baseline**. The target would measure whether a
+model knows EIP-7939, and nothing else. That is [D-15](../DECISIONS.md) at full
+strength — and choosing the target *after* knowing this would make it deliberate
+rather than inherited.
+
+## What this leaves
+
+Every remaining viable target takes **two arguments**, and `GasMeter.buffer()`
+allocates `new bytes(36)`: four bytes of selector and one word. The instrument
+measures `f(uint256)` and nothing else.
+
+So the second task is no longer blocked by a prover. It is blocked by the
+**measuring instrument** — the artifact D-14 records as having been wrong three
+times, each time plausibly. Extending it is mechanical, but it is not the kind of
+change to make quickly, and its acceptance gate is not "it compiles": the order
+control must still read 0 and `log256` must still measure 66 gas/call afterwards.
