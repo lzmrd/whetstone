@@ -8,7 +8,7 @@
  * string and a substring test reports every failure as a proof.
  */
 
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -37,6 +37,94 @@ const ANSI = /\x1B\[[0-9;]*[mK]/g;
 const WALL_MS = 30 * 60 * 1000;
 
 /**
+ * Memory ceiling for one hevm invocation.
+ *
+ * ⚠️ The wall clock above bounds TIME and nothing bounded MEMORY, which is the
+ * limit this project actually hits. On the vanity target hevm reaches 6 GB in
+ * eighteen seconds -- nowhere near the wall clock -- and the kernel's OOM
+ * killer then picks a victim by its own heuristic. Twice that victim was the
+ * editor; once it was a proof job that vanished leaving a log stopped mid-line.
+ * Inside a cgroup the kill lands on hevm and nothing else, which is the whole
+ * point: a prover that cannot fit a function is a RESULT we can record, and a
+ * batch killed halfway through by an unrelated process is not.
+ *
+ * ⚠️ `--scope` is correct HERE and wrong in scripts/prove.sh. A scope belongs to
+ * the process that started it: node stays alive awaiting the child, so the
+ * scope lives exactly as long as the call. prove.sh returns immediately, so its
+ * scope was torn down after 25 seconds -- which is why that script uses a
+ * transient service instead.
+ */
+const MEM_MAX = process.env.HEVM_MEMORY_MAX ?? '6G';
+
+let capState = null;
+
+/**
+ * Wrap an argv in a memory-capped cgroup, when the platform offers one.
+ *
+ * ⚠️ hevm's presence is checked BEFORE wrapping, and separately. Wrapped, a
+ * missing hevm surfaces as systemd-run's failure rather than as ENOENT, and the
+ * ENOENT branch below is load-bearing: it is what stops an absent prover being
+ * softened into UNKNOWN and then into a FUZZED label earned with no prover
+ * involved. Losing that distinction to a convenience wrapper would reopen the
+ * exact hole that branch was written to close.
+ */
+function capped(argv) {
+  if (capState === null) {
+    try {
+      execFileSync('hevm', ['version'], { stdio: 'ignore' });
+    } catch (e) {
+      if (e.code === 'ENOENT') capState = { available: false, hevmMissing: true };
+    }
+    if (capState === null) {
+      try {
+        execFileSync('systemctl', ['--user', 'show-environment'], { stdio: 'ignore' });
+        execFileSync('systemd-run', ['--version'], { stdio: 'ignore' });
+        capState = { available: true, hevmMissing: false };
+      } catch {
+        capState = { available: false, hevmMissing: false };
+      }
+    }
+  }
+  if (capState.hevmMissing) {
+    throw new Error(
+      `hevm is not on the PATH. This is a harness failure, not an UNKNOWN verdict: ` +
+        `without the prover no guarantee label can be earned. Run scripts/bootstrap.sh ` +
+        `and source .envrc.sh.`,
+    );
+  }
+  if (!capState.available) return argv;
+  return [
+    'systemd-run', '--user', '--scope', '--quiet',
+    '-p', `MemoryMax=${MEM_MAX}`, '-p', 'MemorySwapMax=0', '--',
+    ...argv,
+  ];
+}
+
+/**
+ * Why a non-zero hevm exit ended, when it ended without a verdict.
+ *
+ * ⚠️ Exported for testing, and separate from the parsing below on purpose: an
+ * out-of-memory kill must never reach the marker parser. Partial output from a
+ * killed process can contain anything, and the one thing this function must
+ * never do is let a kill be read as a refutation.
+ *
+ * @returns {'wall-clock'|'memory'|null} null when it was not a kill at all
+ */
+export function classifyKill(e, elapsedMs, wallMs = WALL_MS) {
+  // A cgroup OOM kills the child with SIGKILL; systemd-run then exits 137 of
+  // its own accord, so node sees a normal exit with a status and no signal.
+  if (e.code === 137 || e.signal === 'SIGKILL' || e.killed) {
+    // The wall clock is enforced by node, which reports `killed`. Anything that
+    // dies far short of it, having been SIGKILLed, hit the memory ceiling.
+    if (e.killed && elapsedMs >= wallMs * 0.9) return 'wall-clock';
+    if (e.code === 137 || e.signal === 'SIGKILL') return 'memory';
+    return 'wall-clock';
+  }
+  if (e.signal) return 'wall-clock';
+  return null;
+}
+
+/**
  * @returns {Promise<{label: string, equivalent: boolean|null, output: string}>}
  *   label: FORMAL_NO_EXPLICIT_INPUT_BOUND | FORMAL_BOUNDED | REFUTED | UNKNOWN
  *   equivalent: true (proved) | false (counterexample) | null (neither)
@@ -53,9 +141,12 @@ export async function equivalent(fileA, fileB, sig, { timeout = 300, maxIteratio
     '--max-iterations', String(maxIterations),
   ];
 
+  const [cmd, ...argv] = capped(['hevm', ...args]);
+
   let out;
+  const startedAt = Date.now();
   try {
-    const r = await run('hevm', args, { maxBuffer: 64 * 1024 * 1024, timeout: WALL_MS });
+    const r = await run(cmd, argv, { maxBuffer: 64 * 1024 * 1024, timeout: WALL_MS });
     out = `${r.stdout}${r.stderr}`;
   } catch (e) {
     // ⚠️ Two different non-zero exits, and they must NOT be conflated.
@@ -80,7 +171,19 @@ export async function equivalent(fileA, fileB, sig, { timeout = 300, maxIteratio
           `and source .envrc.sh.`,
       );
     }
-    if (e.killed || e.signal) {
+    const kill = classifyKill(e, Date.now() - startedAt);
+    if (kill === 'memory') {
+      return {
+        label: 'UNKNOWN',
+        equivalent: null,
+        output:
+          `hevm was killed at the ${MEM_MAX} memory ceiling after ` +
+          `${Math.round((Date.now() - startedAt) / 1000)}s. No verdict, and the partial ` +
+          `output is deliberately not parsed: this is the prover failing to fit the ` +
+          `function, not a statement about the function.`,
+      };
+    }
+    if (kill === 'wall-clock') {
       return {
         label: 'UNKNOWN',
         equivalent: null,

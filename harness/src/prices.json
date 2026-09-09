@@ -1,7 +1,7 @@
 {
   "_comment": "Provider registry and pinned price table. Prices are NOT fetchable at runtime: the endpoints return no pricing, so every figure here is transcribed by hand from the provider's published page, with that URL and the retrieval date recorded. Every receipt carries this file's version and sha256.",
   "_unit": "USD per 1M tokens",
-  "_version": 3,
+  "_version": 4,
   "_rule": "A model with no entry here cannot be metered and MUST NOT appear in the leaderboard. usd_list is 'what this would cost anyone' at published list price -- it is NOT what we paid. A call served by a free tier still reports the published list price, and the actual spend of zero is a separate fact.",
   "providers": {
     "opencode": {
@@ -9,7 +9,7 @@
       "key_env": "OPENCODE_API_KEY",
       "source": "https://opencode.ai/docs/zen/",
       "retrieved": "2026-09-06",
-      "status": "BLOCKED — GATE 0, 7 Sep: free tier is client-only and the API refuses it; paid models report an empty balance",
+      "status": "BLOCKED \u2014 GATE 0, 7 Sep: free tier is client-only and the API refuses it; paid models report an empty balance",
       "models": {
         "minimax-m3": {
           "input": 0.3,
@@ -68,7 +68,7 @@
       "key_env": "GROQ_API_KEY",
       "source": "https://groq.com/pricing/",
       "retrieved": "2026-09-07",
-      "status": "ACTIVE — 3 model(s) selected: open-weight only, R14 reviewers excluded",
+      "status": "ACTIVE \u2014 3 model(s) selected: open-weight only, R14 reviewers excluded",
       "models": {
         "openai/gpt-oss-120b": {
           "input": 0.15,
@@ -91,10 +91,30 @@
     "openrouter": {
       "base_url": "https://openrouter.ai/api/v1",
       "key_env": "OPENROUTER_API_KEY",
-      "source": "https://openrouter.ai/models",
-      "retrieved": "2026-09-07",
-      "status": "ACTIVE — 3 model(s) selected: open-weight only, R14 reviewers excluded",
+      "source": "https://openrouter.ai/docs/guides/overview/models (catalogue), https://openrouter.ai/api/v1/models (prices)",
+      "retrieved": "2026-09-09",
+      "status": "ACTIVE \u2014 4 PAID model(s) selected: open-weight only, R14 reviewers excluded. All four smoke-tested on 9 Sep: each answered and returned token usage.",
       "models": {
+        "deepseek/deepseek-v4-flash": {
+          "input": 0.084,
+          "output": 0.168,
+          "cached_read": 0.0168
+        },
+        "qwen/qwen3-coder-30b-a3b-instruct": {
+          "input": 0.07,
+          "output": 0.28,
+          "cached_read": null
+        },
+        "mistralai/mistral-small-3.2-24b-instruct": {
+          "input": 0.075,
+          "output": 0.2,
+          "cached_read": null
+        },
+        "meta-llama/llama-4-scout": {
+          "input": 0.1,
+          "output": 0.3,
+          "cached_read": null
+        },
         "google/gemma-4-31b-it:free": {
           "input": 0,
           "output": 0,
@@ -111,7 +131,9 @@
           "cached_read": null
         }
       },
-      "price_origin": "fetched from the provider /models endpoint, then pinned"
+      "price_origin": "fetched from https://openrouter.ai/api/v1/models on 2026-09-09, then pinned by hand",
+      "_why_not_the_free_tier": "\u26a0\ufe0f The three ':free' entries below are LISTED but NOT selected, and the entries are kept so that decision is visible rather than silent. Two reasons. The builder's: a benchmark of models nobody pays for is not the question being asked. The methodological one: a free endpoint's serving configuration -- quantisation, context truncation, routing to a different deployment -- cannot be verified from outside, so the model id may not identify what actually ran. That is a possibility rather than a measured fact, and it is enough to prefer the paid route when the paid route costs a fifth of a cent per run.",
+      "_cost_reality": "Measured from the 15 receipts already published: a run costs between $0.0009 and $0.0108, median about half a cent. Every model added here is CHEAPER per token than groq/openai/gpt-oss-120b, which the project has been running since 8 Sep. A full batch of 4 tasks x 7 models x 5 seeds is well under one dollar. Money was never the binding constraint, and BUDGET_USD_MAX exists to bound a runaway loop, not to ration."
     }
   }
 }
