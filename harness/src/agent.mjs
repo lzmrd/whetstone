@@ -63,7 +63,26 @@ export function clampLabel(label, taskGuarantee) {
 
 export const INTERFACE = {
   max_rounds: 8,
-  budget_usd_per_run: 0.05,
+  /**
+   * ⚠️ Raised from 0.05 when the preflight made it binding.
+   *
+   * A soft budget and a hard one bind different things. At $0.05 with a
+   * 6 000-token reply ceiling, gpt-oss-20b could fund 25 rounds and
+   * qwen3.6-27b could fund 2 -- against a `max_rounds` of 8 that this
+   * interface declares identical for every model. Enforcing the budget would
+   * therefore have handed cheap models more attempts than expensive ones, and
+   * turned a cost limit into a per-model handicap on the independent variable.
+   *
+   * At $0.50 the worst case for the most expensive model we have is 26 rounds,
+   * so `max_rounds` is what binds for everyone, as it did for all 31 runs
+   * already published. The budget is now a real ceiling that does not shape the
+   * experiment: with 8 rounds, the most a run can actually cost is about $0.15.
+   *
+   * ⚠️ Both numbers are arbitrary. What matters is that only ONE of the two
+   * declared-identical parameters does the binding, and that it is the same one
+   * for every model.
+   */
+  budget_usd_per_run: 0.50,
   // ⚠️ Part of the declared interface, like max_rounds -- NOT a tuning knob.
   // Reasoning models spend most of their budget thinking: gpt-oss-20b produced
   // 23 000 characters of reasoning and no answer, which the loop first recorded
@@ -308,6 +327,7 @@ export async function runAgent({
     // have answered a question about a function that was never run.
     sig,
     max_rounds: maxRounds,
+    budget_usd: budgetUsd,
     mutation_refuted: prepared.mutation_refuted,
     mutation_strength: prepared.mutation_strength,
     baseline_runtime: baseline.runtime,

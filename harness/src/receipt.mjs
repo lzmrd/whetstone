@@ -87,6 +87,11 @@ export async function buildReceipt({ run, spec, taskSource, taskPath, payment, p
       // that never happened. Reading the constant instead would fix the drift
       // and still describe the constant rather than the run.
       max_rounds: run.max_rounds ?? null,
+      // ⚠️ A declared interface parameter that did not travel with the run it
+      // governed. It is enforced now, so a reader can check the spend against
+      // the limit that was actually in force instead of against whatever the
+      // documents say today.
+      budget_usd_per_run: run.budget_usd ?? null,
       rounds_used: run.rounds.length,
       outcomes: run.rounds.map((r) => r.outcome),
       stop_reason: run.stop_reason,
