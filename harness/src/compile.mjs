@@ -65,7 +65,9 @@ export async function compileToRuntime(source, contractName) {
   ];
 
   try {
-    const { stdout } = await run('solc', args, { maxBuffer: 32 * 1024 * 1024 });
+    // ⚠️ Timed out, not merely buffered. The input is untrusted model output and
+    // solc can be driven into pathological compile times by a crafted type.
+    const { stdout } = await run('solc', args, { maxBuffer: 32 * 1024 * 1024, timeout: 120_000 });
     // solc prints:  ======= /path/File.sol:Name =======\nBinary of the runtime part:\n<hex>
     const re = new RegExp(
       `=======[^=]*:${contractName}\\s*=======[\\s\\S]*?Binary of the runtime part:\\s*([0-9a-fA-F]*)`,

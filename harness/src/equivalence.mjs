@@ -25,6 +25,18 @@ export async function checkerVersion() {
 const ANSI = /\x1B\[[0-9;]*[mK]/g;
 
 /**
+ * Wall clock for one hevm invocation.
+ *
+ * ⚠️ `--smt-timeout` bounds a single SMT query, not the process: hevm can keep
+ * generating queries indefinitely on an input it cannot fold. Without this the
+ * whole batch hangs on one patch, which is a denial of service handed to us by
+ * whatever a model happened to emit. Generous rather than tight -- a real proof
+ * on the current targets takes seconds, so anything near this bound has already
+ * failed in practice.
+ */
+const WALL_MS = 30 * 60 * 1000;
+
+/**
  * @returns {Promise<{label: string, equivalent: boolean|null, output: string}>}
  *   label: FORMAL_NO_EXPLICIT_INPUT_BOUND | FORMAL_BOUNDED | REFUTED | UNKNOWN
  *   equivalent: true (proved) | false (counterexample) | null (neither)
@@ -43,10 +55,38 @@ export async function equivalent(fileA, fileB, sig, { timeout = 300, maxIteratio
 
   let out;
   try {
-    const r = await run('hevm', args, { maxBuffer: 64 * 1024 * 1024 });
+    const r = await run('hevm', args, { maxBuffer: 64 * 1024 * 1024, timeout: WALL_MS });
     out = `${r.stdout}${r.stderr}`;
   } catch (e) {
-    // hevm exits non-zero on a refutation, which is a RESULT, not an error.
+    // ⚠️ Two different non-zero exits, and they must NOT be conflated.
+    //
+    //   refutation  hevm exits non-zero on a counterexample. That is a RESULT.
+    //   killed      the wall clock ran out. There is no verdict, and whatever
+    //               partial output exists must not be parsed for one --
+    //               `--smt-timeout` bounds each SMT query, nothing bounds the
+    //               number of queries, so a pathological input can run forever.
+    // ⚠️ The prover being ABSENT is not a verdict of any kind.
+    //
+    // Found while regression-testing the wall clock above: with hevm off the
+    // PATH this function returned UNKNOWN, and agent.mjs turns UNKNOWN into a
+    // fall back to gates 1 and 2, which awards the FUZZED label. A guarantee
+    // label would have been earned, published to HCS and written on chain with
+    // no prover involved at any point. A missing tool is a harness error and
+    // must stop the run, not soften it by one rung.
+    if (e.code === 'ENOENT') {
+      throw new Error(
+        `hevm is not on the PATH. This is a harness failure, not an UNKNOWN verdict: ` +
+          `without the prover no guarantee label can be earned. Run scripts/bootstrap.sh ` +
+          `and source .envrc.sh.`,
+      );
+    }
+    if (e.killed || e.signal) {
+      return {
+        label: 'UNKNOWN',
+        equivalent: null,
+        output: `hevm exceeded the ${WALL_MS / 1000}s wall clock and was killed. No verdict.`,
+      };
+    }
     out = `${e.stdout ?? ''}${e.stderr ?? ''}` || e.message;
   }
   const plain = out.replace(ANSI, '');

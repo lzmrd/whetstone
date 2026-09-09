@@ -21,7 +21,7 @@ const REPO = fileURLToPath(new URL('../../', import.meta.url));
 
 /** The campaign IS the label: §7 requires runs, seed and what was compared. */
 export async function fuzzCampaign() {
-  const { stdout } = await run('forge', ['config', '--json'], { cwd: REPO, maxBuffer: 8e6 });
+  const { stdout } = await run('forge', ['config', '--json'], { cwd: REPO, maxBuffer: 8e6, timeout: 60_000 });
   const cfg = JSON.parse(stdout);
   return {
     runs: cfg.fuzz?.runs ?? null,
@@ -40,7 +40,8 @@ export async function differential(taskHex, patchHex) {
     const { stdout } = await run(
       'forge',
       ['test', '--match-contract', 'DifferentialTest'],
-      { cwd: REPO, env, maxBuffer: 32e6 },
+      // 20 001 fuzz runs against etched bytecode; generous, but bounded.
+      { cwd: REPO, env, maxBuffer: 32e6, timeout: 900_000 },
     );
     return { passed: true, gate: null, counterexample: null, output: stdout };
   } catch (e) {
@@ -71,7 +72,7 @@ export async function mutationStrength(taskHex, originalHex) {
   const { stdout } = await run(
     'forge',
     ['test', '--match-test', 'test_mutation_strength', '-vv'],
-    { cwd: REPO, env, maxBuffer: 32e6 },
+    { cwd: REPO, env, maxBuffer: 32e6, timeout: 300_000 },
   );
   const m = stdout.match(/WHETSTONE_DIVERGENCE (\d+) (\d+)/);
   if (!m) throw new Error(`mutation strength did not report a number:\n${stdout}`);

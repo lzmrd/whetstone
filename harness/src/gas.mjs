@@ -20,7 +20,7 @@ export async function measurePatch(taskHex, patchHex) {
     const r = await run(
       'forge',
       ['test', '--match-contract', 'PatchGasTest', '-vv'],
-      { cwd: REPO, env: { ...process.env, TASK_HEX: taskHex, PATCH_HEX: patchHex }, maxBuffer: 32e6 },
+      { cwd: REPO, env: { ...process.env, TASK_HEX: taskHex, PATCH_HEX: patchHex }, maxBuffer: 32e6, timeout: 600_000 },
     );
     out = r.stdout;
   } catch (e) {

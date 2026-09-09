@@ -158,7 +158,7 @@ export async function recordRun(receipt, hcs = {}) {
     const { stdout } = await run(
       'cast',
       ['send', address, SIG, tuple(row), '--rpc-url', rpc, '--private-key', key, '--json'],
-      { cwd: REPO, maxBuffer: 8e6 },
+      { cwd: REPO, maxBuffer: 8e6, timeout: 180_000 },
     );
     const tx = JSON.parse(stdout).transactionHash;
     return { recorded: true, tx, address, reason: null };
@@ -183,7 +183,7 @@ export async function retryPending() {
   for (const entry of lines) {
     try {
       await run('cast', ['send', address, SIG, tuple(entry.row), '--rpc-url', rpc,
-                         '--private-key', key, '--json'], { cwd: REPO, maxBuffer: 8e6 });
+                         '--private-key', key, '--json'], { cwd: REPO, maxBuffer: 8e6, timeout: 180_000 });
       recorded++;
     } catch (e) {
       left.push({ ...entry, why: `${e.stderr ?? e.message}`.trim().split('\n')[0] });

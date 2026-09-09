@@ -66,10 +66,26 @@ if (!PAY_TO) {
   process.exit(1);
 }
 
+/**
+ * ⚠️ Bounded. An unbounded reader on a public listener is a memory exhaustion
+ * with no exploit needed: one request that never ends. The cap is far above any
+ * real chat completion, so it can only be hit deliberately.
+ */
+const MAX_BODY_BYTES = 1024 * 1024;
+
 const read = (req) =>
   new Promise((resolve, reject) => {
     const chunks = [];
-    req.on('data', (c) => chunks.push(c));
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > MAX_BODY_BYTES) {
+        reject(Object.assign(new Error('request body too large'), { tooLarge: true }));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
   });
@@ -85,7 +101,10 @@ const server = createServer(async (req, res) => {
 
   let body;
   try { body = JSON.parse(await read(req)); }
-  catch { return json(res, 400, { error: 'body is not JSON' }); }
+  catch (e) {
+    if (e?.tooLarge) return json(res, 413, { error: `body exceeds ${MAX_BODY_BYTES} bytes` });
+    return json(res, 400, { error: 'body is not JSON' });
+  }
 
   // The client addresses provider/model; the provider key never leaves this side.
   const spec = String(body.model ?? '');
@@ -191,10 +210,23 @@ process.on('uncaughtException', (e) => {
   console.error(`\n⚠️  uncaught exception (the gateway stays up): ${e?.stack ?? e}\n`);
 });
 
-server.listen(PORT, () => {
+/**
+ * ⚠️ Bound to the loopback interface explicitly.
+ *
+ * `listen(PORT)` binds 0.0.0.0 — every interface — while the banner below has
+ * always printed `127.0.0.1`. On any shared or public network that exposed a
+ * proxy which spends our provider API keys, gated by nothing but a payment made
+ * to us. The log was not describing the server; it was describing an intention.
+ *
+ * Set GATEWAY_HOST deliberately to serve a third-party agent — the answer this
+ * project gives to the closed-loop objection — but as a choice, not a default.
+ */
+const HOST = process.env.GATEWAY_HOST ?? '127.0.0.1';
+
+server.listen(PORT, HOST, () => {
   console.log(`
 x402-gated inference gateway
-  listening   http://127.0.0.1:${PORT}
+  listening   http://${HOST}:${PORT}
   tariff      ${TARIFF.base} base + ${TARIFF.perInputToken}/input token + ${TARIFF.perOutputToken}/output token (tinybar)
               metered per call — the amount differs with every request
   paid to     ${PAY_TO}
