@@ -66,10 +66,60 @@ baseline, and results from the two are never comparable. See Track S and Track H
 What is built this week is a **method demonstration with a leaderboard interface**.
 It is **not a ranking of models**.
 
-- **1-2 functions, n≥5 seeds per configuration.**
+- **Two functions** — `log256-bytelen/v1` and `satmul-halved/v1` — with n seeds per configuration.
+- ⚠️ **`n≥5` is the declared discipline and it was not kept**: **5 of 9** batches ran n=2 or n=3. `batch.mjs` computes the median and dispersion correctly; the sample behind some of them is thinner than the rule requires.
 - With that few independent tasks you cannot rank models, and this project does not claim to. Ties are the normal outcome and are reported as ties.
-- The question it answers: *"how does an agent perform on a small, declared set of Solidity tasks under a fixed budget?"*
-- The question it does **not** answer yet: *"which model is better at optimizing Solidity?"* — that needs Track H.
+- **The question it answers**: *"what has to be true for the claim 'this model saved gas' to be checkable by somebody else?"* The answer is the rig — a mutation that makes the memorised answer wrong, gates that name the strength of their own proof, cost tied to that strength, and a receipt anyone can recompute from.
+- The question it does **not** answer: *"which model is better at optimizing Solidity?"* — too few tasks, too few seeds, and **31 of 31** scored runs have earned the same guarantee label, so the vocabulary has not yet discriminated between anything. That needs Track H.
+
+**The leaderboard is the demonstration of the rig, not the product.**
+
+## What holds the numbers up
+
+The unusual parts of this repository are not on the leaderboard. They are the
+controls that let a reader decide whether any number here means anything — and
+they are the reason a null result and a broken prediction are both written down.
+
+**A negative control that has to be refused.** `manifest-negative.json` is a
+deliberately cosmetic mutation: a bare `revert` bolted onto an untouched body. It
+passes the naive check — hevm refutes `task ≡ original` on one divergent input —
+and is **still rejected**, because proof 2b requires a semantic mutation to move
+≥50% of the scenario. The real mutation moves 769/769; this one moves 1/769. A
+gate is only a gate if something fails it, and this is the something.
+
+**A trivial floor.** `Trivial.sol` is the task with one word deleted — no
+understanding required — and proof 3 checks that the deleted check really was
+dead. A patch that does not beat that floor has demonstrated nothing, whatever
+percentage it prints. On `log256` the floor (69 gas) **exceeds the entire
+OpenZeppelin-to-solady gap** (66), which is why 4 of 4 runs never beat it: a fact
+about the target, and the reason a second one exists.
+
+**A pre-registered prediction that was falsified, and recorded as such.** The
+expected outcome on `log256` — zero, or noise-level churn — was written into the
+spec *before* the first measured run. It broke: the model beat the baseline on 6
+of the first 22 scored runs, peaking at 136.7% of it. The cause was not capability
+but an opcode — 24 patches use `clz`, reachable only under `evm_version = 'osaka'`,
+which the pinned solady predates. It is written up in [D-15](spec/DECISIONS.md),
+and the denominator is deliberately **not** repaired.
+
+**Retractions left in place.** Claims this repository once made and has since
+withdrawn stay visible with the reason attached, rather than being edited away —
+including one further up this page.
+
+**Who wrote the mutation is a declared fact, not an assumption.** The whole
+anti-memorisation defence rests on `M`, so its authorship is on the record.
+`log256-bytelen/v1` is **model-written** — Claude, at the builder's explicit
+instruction. `satmul-halved/v1` is **builder-chosen**, from five candidates
+presented in prose with their measured divergence *before* any was written as
+code; two were dead on arrival because proof 2b needs ≥50% of the scenario moved
+and they moved 29.5%. [AI_USAGE.md](AI_USAGE.md) carries the full split — and
+records the objection against itself, that a menu assembled by a model is already
+a form of authorship.
+
+**A clean clone reproduces the bytecode.** `scripts/bootstrap.sh`, verified from
+scratch: bootstrap → tests pass → runtime bytecode **byte-identical**. "Anyone can
+recompute this" is worth nothing if nobody else can build it.
+
 
 ## Prior art
 

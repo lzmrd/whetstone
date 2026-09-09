@@ -1,0 +1,35 @@
+{
+  "_comment": "THIRD TASK, and the first admitted under D-16. hevm does not terminate on a string-building function, so proofs 1 and 3 are established by gates 1 and 2 instead -- which caps every run scored on this task at FUZZED. Before D-16 this target could not exist.",
+  "id": "hexaddr-inverted/v1",
+  "kind": "semantic",
+  "task": {
+    "path": "contracts/src/tasks/hexaddr/Task.sol",
+    "contract": "HexAddrCandidate",
+    "sig": "f(uint256)"
+  },
+  "baseline": {
+    "path": "contracts/src/tasks/hexaddr/Baseline.sol",
+    "contract": "HexAddrBaseline"
+  },
+  "original": {
+    "path": "contracts/src/tasks/hexaddr/Original.sol",
+    "contract": "HexAddrOriginal"
+  },
+  "mutation": {
+    "description": "the digit alphabet is INVERTED -- the value d is written as the character for 15 - d",
+    "author": "the builder (lzmrd)",
+    "_author_note": "⚠️ HUMAN-CHOSEN, the second such task. Three candidates were presented with their measured divergence AND their surviving headroom, both before implementation. The Solidity and assembly transcription is the model's. See AI_USAGE.md.",
+    "applied_to": ["task", "baseline"],
+    "_why_not_a_wrapper": "The obvious mutations on a string-returning function wrap the output -- drop the 0x prefix, reverse the result. Those move 100% of renderings and are WEAK: a memorised body stays intact and reusable, since the model can paste what it knows and append the transformation. Proof 2b measures how far the output moved, not whether a memorised answer stays useful, and on a wrapper mutation the two come apart. This edit lands inside the loop, on the table the digits are read from.",
+    "_rejected": "The uppercase alphabet moves only 32.8% of the scenario -- just 157 of the 478 distinct addresses render with any letter a-f -- and proof 2b requires 50%.",
+    "proof_1_baseline_equals_task": "must PASS or be established by gates 1+2 (D-16)",
+    "proof_2_task_differs_from_original": "must REFUTE, or UNKNOWN carried by proof 2b"
+  },
+  "trivial": {
+    "path": "contracts/src/tasks/hexaddr/Trivial.sol",
+    "contract": "HexAddrTrivial",
+    "description": "the task with the loop body wrapped in unchecked -- forty dead underflow checks per call, no understanding required",
+    "proof_3_trivial_equals_task": "must PASS or be established by gates 1+2 (D-16)"
+  },
+  "_scenario_note": "⚠️ boundary/v1 has 769 inputs, but truncated to 160 bits they collapse to 478 distinct addresses. The target is measured on 478 distinct points, and that is a wrapper assumption, recorded here rather than left to be discovered."
+}

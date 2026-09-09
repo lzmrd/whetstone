@@ -99,6 +99,7 @@ contract SweepGasTest is Test {
         _pair("base58",        "OzB58",      "SdB58",      1);
         console.log("");
         console.log("== does the headroom survive the mutation? ==");
+        _pair("hexAddr MUTATED", "OzHexAddrMut", "SdHexAddrMut", 1);
         _pair("max M1 halved",  "OzMaxHalved", "SdMaxHalved", 2);
         _pair("max M2 compl",   "OzMaxCompl",  "SdMaxCompl",  2);
         _pair("min M1 halved",  "OzMinHalved", "SdMinHalved", 2);
