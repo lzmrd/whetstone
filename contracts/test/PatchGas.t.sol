@@ -43,7 +43,7 @@ contract PatchGasTest is Test {
         _load("TASK_HEX", TASK);
         _load("PATCH_HEX", PATCH);
 
-        Plan.Spec memory plan = Plan.forSig(vm.envOr("TASK_SIG", string("f(uint256)")));
+        Plan.Spec memory plan = Plan.forSig(vm.envOr("TASK_SIG", string("f(uint256)")), vm.envOr("TASK_SCENARIO", string("")));
         uint256 n = plan.xs.length;
         bytes memory cd = plan.newBuffer();
 

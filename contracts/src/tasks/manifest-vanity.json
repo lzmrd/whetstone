@@ -1,0 +1,57 @@
+{
+  "_comment": "FOURTH TASK, and the first built on code that is not OpenZeppelin. Uniswap v4-periphery, VanityAddressLib.score, MIT, commit e75fd8878c70d18234cdf9d0bfeeae6e16713037. hevm cannot fit this function -- 6 GB and 2m25s of CPU in 18 seconds, then oom-kill -- so proofs 1 and 3 are established by gates 1 and 2 under D-16, which caps every run scored on this task at FUZZED.",
+  "id": "vanity-tariff/v1",
+  "kind": "semantic",
+  "task": {
+    "path": "contracts/src/tasks/vanity/Task.sol",
+    "contract": "VanityCandidate",
+    "sig": "f(uint256)",
+    "scenario": "vanity/v1"
+  },
+  "baseline": {
+    "path": "contracts/src/tasks/vanity/Baseline.sol",
+    "contract": "VanityBaseline",
+    "_provenance": "⚠️ NOT a third party's. Every previous baseline is solady's, so the denominator was written by someone with no stake in the score. There is no solady counterpart to VanityAddressLib -- that absence is precisely what D-07 called the Uniswap pincer -- so this one was written here. The consequence is declared rather than hidden: the receipt reports the ABSOLUTE gas delta for this task, the baseline's runtime hash is published as for every other task, and the equivalence evidence is enumerated below instead of being asserted."
+  },
+  "original": {
+    "path": "contracts/src/tasks/vanity/Original.sol",
+    "contract": "VanityOriginal"
+  },
+  "upstream": {
+    "project": "Uniswap v4-periphery",
+    "file": "src/libraries/VanityAddressLib.sol",
+    "function": "score(address)",
+    "licence": "MIT",
+    "commit": "e75fd8878c70d18234cdf9d0bfeeae6e16713037",
+    "_no_imports": "The file is self-contained. Nothing from v4-core is pulled in, which matters because v4-core is BUSL-1.1 and out of scope by D-07.",
+    "_who_pays_this_gas": "⚠️ Nobody inside v4-periphery. The full repository tree at the pinned commit was fetched and checked: the only file referencing VanityAddressLib is its own test. It is a published utility for hook-address miners, so the saving is real but it is their consumers' cost, not Uniswap's. Any claim that omits this is oversell."
+  },
+  "mutation": {
+    "description": "the scoring TARIFF is re-set: 10 -> 7 points per leading zero nibble, 60 -> 50 for exactly four leading fours, 40 -> 30 for more than four, 1 -> 2 per nibble equal to 4, 20 -> 25 for a trailing 0x4444",
+    "author": "the builder (lzmrd)",
+    "_author_note": "⚠️ HUMAN-CHOSEN, the third such task. See AI_USAGE.md.",
+    "applied_to": ["task", "baseline", "trivial"],
+    "_why_not_the_digit": "The obvious mutation is to change the special digit from 4 to something else, and it is a TRAP. The scenario's scoring population is defined by that digit, so changing it would push every scoring address into the early-exit path: the measured function would become the cheap branch and the headroom would evaporate. That is the max/min collapse -- 59 gas/call before the mutation, 9 after -- avoided in advance rather than discovered afterwards. Re-tariffing leaves the early-exit population identical before and after, so what is measured is the same code either way.",
+    "_why_the_per_four_point_changed_too": "Without it the mutation does not move addresses with no leading zeros and a run of 1, 2 or 3 fours: every other term is unchanged for them. Since every scoring address contains at least one 4 by construction, doubling that term moves all of them.",
+    "proof_2_task_differs_from_original": "REFUTED by construction; proof 2b measured at 192/264 = 72.7% of the scenario, against a ceiling of 197/264 = 74.6% (the addresses that score at all -- an address that early-exits returns 0 under every tariff)"
+  },
+  "trivial": {
+    "path": "contracts/src/tasks/vanity/Trivial.sol",
+    "contract": "VanityTrivial",
+    "description": "the task with the body of _getLeadingNibbleCount wrapped in unchecked -- `count += 1` and `i++` are checked on every iteration of a loop that runs twice per call, and _score's own unchecked block does not reach into a separate function",
+    "proof_3_trivial_equals_task": "established by gates 1+2 under D-16"
+  },
+  "measured": {
+    "scenario": "vanity/v1",
+    "scenario_inputs": 264,
+    "scenario_digest": "0x2d2fcbae6a80656bae812ebb424f30b5e93e877a00d259f40755177b798439c6",
+    "task_gas_per_call": 15146,
+    "baseline_gas_per_call": 1009,
+    "trivial_gas_per_call": 13746,
+    "headroom_gas_per_call": 14137,
+    "trivial_floor_gas_per_call": 1399,
+    "_floor_ratio": "The floor is 9% of the headroom. For comparison, on log256 the one-word floor (69) EXCEEDED the whole OZ-to-solady gap (66), which is why four runs on that target never beat it. This is the first task in the corpus with room between a reflex and an expert implementation.",
+    "_equivalence_evidence": "hevm: oom-kill at 6 GB. In its place: the full 264-input scenario, 60 000 fuzz runs across three campaigns (including one that forces the trailing-0x4444 branch, which a random tail reaches once in 65 536), and an exhaustive pass over all 861 reachable (leading zeros, leading fours) pairs against three tails."
+  },
+  "_scenario_note": "⚠️ vanity/v1 exists because boundary/v1 cannot carry this target: it collapses to 478 distinct addresses of which roughly five sixths take the early exit, so the gas reading would be mostly the early exit and proof 2b could not reach 50% for ANY mutation. See Scenario.sol."
+}

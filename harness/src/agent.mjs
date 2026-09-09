@@ -242,6 +242,7 @@ export async function runAgent({
   prepared,
   contractName = prepared?.manifest.task.contract ?? 'Candidate',
   sig = prepared?.manifest.task.sig ?? 'f(uint256)',
+  scenario = prepared?.manifest.task.scenario ?? '',
   price = { input: 0, output: 0 },
   maxRounds = INTERFACE.max_rounds,
   budgetUsd = INTERFACE.budget_usd_per_run,
@@ -276,7 +277,7 @@ export async function runAgent({
 
   // The denominator, measured once per run against the same instrument the
   // patch will be measured with.
-  const baselineGas = await measurePatch(taskBuild.path, baseline.path, sig);
+  const baselineGas = await measurePatch(taskBuild.path, baseline.path, sig, scenario);
 
   /**
    * GATE 4 — `gas(solady_M) < gas(OZ_M)`. The RUNBOOK says "verify, do not
@@ -302,7 +303,7 @@ export async function runAgent({
   }
 
   // The floor: what a one-word edit recovers, measured once with the same instrument.
-  const trivialGas = trivial ? await measurePatch(taskBuild.path, trivial.path, sig) : null;
+  const trivialGas = trivial ? await measurePatch(taskBuild.path, trivial.path, sig, scenario) : null;
 
   const messages = [
     { role: 'system', content: SYSTEM_PROMPT },
@@ -441,7 +442,7 @@ export async function runAgent({
           // DISAGREEMENT here cannot be a property of the patch -- it means our
           // own plumbing is broken (wrong bytecode etched, wrong file compared).
           // Cheap, and it fails loudly instead of silently scoring the wrong pair.
-          const cross = await differential(taskBuild.path, built.path, sig);
+          const cross = await differential(taskBuild.path, built.path, sig, scenario);
           if (!cross.passed) {
             throw new Error(
               `INTEGRITY FAILURE: hevm proved the patch equivalent, but gate ${cross.gate} found a ` +
@@ -450,7 +451,7 @@ export async function runAgent({
             );
           }
           log(round, 'proved', eq.label);
-          const gas = await measurePatch(taskBuild.path, built.path, sig);
+          const gas = await measurePatch(taskBuild.path, built.path, sig, scenario);
           // ⚠️ Above 100% is expected and legitimate: the patch beat the
           // baseline, it did not violate a limit. The baseline is not a ceiling.
           // Established at GATE 4 above, before any inference was bought.
@@ -486,13 +487,13 @@ export async function runAgent({
           // differential evidence of any kind. A ladder whose lower rungs are
           // skipped when the top one fails is not a ladder.
           log(round, 'unknown', 'prover did not terminate — falling back to gates 1 and 2');
-          const diff = await differential(taskBuild.path, built.path, sig);
+          const diff = await differential(taskBuild.path, built.path, sig, scenario);
 
           if (diff.passed) {
             const campaign = await fuzzCampaign();
             log(round, 'fuzzed', `${campaign.runs} runs, seed ${campaign.seed}, no divergence`);
             run.rounds.push({ round, outcome: 'fuzzed', label: 'FUZZED' });
-            const gas = await measurePatch(taskBuild.path, built.path, sig);
+            const gas = await measurePatch(taskBuild.path, built.path, sig, scenario);
             gas.baseline_total = baselineGas.patch_total;
             gas.relative_progress = Number((gas.saved_total / denominator).toFixed(4));
             run.gas = gas;

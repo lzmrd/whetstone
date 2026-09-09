@@ -40,4 +40,24 @@ contract HarnessSelfCheckTest is Test {
             "the scenario vector changed: every previously published score refers to a different benchmark"
         );
     }
+
+    /// ⚠️ The same gate as above, for the two scenarios added later. A digest
+    /// that changes silently re-scopes every score already published under its
+    /// name -- and `boundary/v1` is quoted in fifteen receipts that are on
+    /// chain and cannot be corrected.
+    function test_the_other_two_scenarios_are_the_committed_vectors() public pure {
+        assertEq(Scenario.pairs2Len(), 1444);
+        assertEq(
+            Scenario.digest2(),
+            0x422707a2c07bdc62c16e94a743c72441249acd6e83c6bd34cd7a80a7113387e7,
+            "pairs/v1 changed: every satmul score refers to a different benchmark"
+        );
+
+        assertEq(Scenario.addresses().length, 264);
+        assertEq(
+            Scenario.digest3(),
+            0x2d2fcbae6a80656bae812ebb424f30b5e93e877a00d259f40755177b798439c6,
+            "vanity/v1 changed: every vanity score refers to a different benchmark"
+        );
+    }
 }

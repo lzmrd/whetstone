@@ -2,6 +2,7 @@
 pragma solidity 0.8.35;
 
 import {Test, console} from "forge-std/Test.sol";
+import {Scenario} from "./Scenario.sol";
 import {UniVanity, UniVanityFast} from "../src/spike/uniswap/VanityProbes.sol";
 
 /// TRIAGE for the Uniswap candidate. Answers two questions and nothing else:
@@ -209,5 +210,22 @@ contract VanitySweepTest is Test {
             }
         }
         console.log("exhaustive (zeros x fours x tail) comparisons", checked);
+    }
+
+    /// ⚠️ The precondition proof 2b depends on, asserted rather than assumed.
+    ///
+    /// A mutation can only move an address whose score is not zero, because an
+    /// address that early-exits returns 0 under every tariff. So the fraction
+    /// of `vanity/v1` that scores at all is a CEILING on what any re-tariffing
+    /// mutation can move, and proof 2b needs more than half. Measuring this
+    /// before writing the task is the whole lesson of max/min, where the
+    /// headroom was measured before the mutation and collapsed after it.
+    function test_the_scenario_can_carry_a_tariff_mutation() public view {
+        uint256[] memory xs = Scenario.addresses();
+        uint256 scoring;
+        for (uint256 i = 0; i < xs.length; i++) if (a.f(xs[i]) != 0) scoring++;
+        console.log("vanity/v1: scoring inputs", scoring, "of", xs.length);
+        console.log("ceiling on proof 2b, percent", (scoring * 100) / xs.length);
+        assertGt(scoring * 2, xs.length, "vanity/v1 cannot carry any tariff mutation past proof 2b");
     }
 }

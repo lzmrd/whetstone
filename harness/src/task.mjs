@@ -46,7 +46,7 @@ export function loadManifest(path = process.env.TASK_MANIFEST ?? 'contracts/src/
  *
  * @returns {{level: 'FORMAL'|'FUZZED', label: string, campaign: object|null}}
  */
-async function establishEquivalence(aPath, bPath, sig, what) {
+async function establishEquivalence(aPath, bPath, sig, what, scenario = '') {
   const eq = await equivalent(aPath, bPath, sig);
   if (eq.equivalent === true) return { level: 'FORMAL', label: eq.label, campaign: null };
   if (eq.equivalent === false) {
@@ -56,7 +56,7 @@ async function establishEquivalence(aPath, bPath, sig, what) {
     );
   }
 
-  const diff = await differential(aPath, bPath, sig);
+  const diff = await differential(aPath, bPath, sig, scenario);
   if (!diff.passed) {
     throw new Error(
       `${what} FAILED: the prover did not terminate AND gate ${diff.gate} found a divergence. ` +
@@ -88,10 +88,12 @@ export async function prepareTask(manifest) {
   }
 
   const sig = manifest.task.sig;
+  // Empty unless the manifest names one; see Plan.forSig.
+  const scenario = manifest.task.scenario ?? '';
 
   // proof 1 — the baseline computes the task. Without it the denominator is a
   // different function and the metric is meaningless.
-  const p1 = await establishEquivalence(baseline.path, task.path, sig, 'proof 1 (baseline == task)');
+  const p1 = await establishEquivalence(baseline.path, task.path, sig, 'proof 1 (baseline == task)', scenario);
 
   /**
    * proof 2 — and its expected outcome INVERTS with the kind of variant.
@@ -155,7 +157,7 @@ export async function prepareTask(manifest) {
    * is the bare-revert variant, and `manifest-negative.json` runs it through this
    * function. It passes proof 2 and is refused here at 1/769.
    */
-  const strength = await mutationStrength(task.path, original.path, sig);
+  const strength = await mutationStrength(task.path, original.path, sig, scenario);
   if (kind === 'semantic' && strength.fraction < 0.5) {
     throw new Error(
       `proof 2b FAILED: the mutation changes behaviour on only ${strength.diverged}/${strength.total} ` +
@@ -182,7 +184,7 @@ export async function prepareTask(manifest) {
   let proof_3 = null;
   let p3 = null;
   if (trivial) {
-    p3 = await establishEquivalence(trivial.path, task.path, sig, 'proof 3 (trivial == task)');
+    p3 = await establishEquivalence(trivial.path, task.path, sig, 'proof 3 (trivial == task)', scenario);
     proof_3 = p3.label;
   }
 

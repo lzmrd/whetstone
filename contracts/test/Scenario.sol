@@ -81,11 +81,100 @@ library Scenario {
         }
     }
 
+    function pairs2Len() internal pure returns (uint256) {
+        (uint256[] memory xs,) = pairs();
+        return xs.length;
+    }
+
     /// Identity of the two-argument scenario. Same rule as `digest()`: it
     /// commits to the VECTOR, so "pairs/v1" cannot come to mean something else.
     function digest2() internal pure returns (bytes32) {
         (uint256[] memory xs, uint256[] memory ys) = pairs();
         return keccak256(abi.encode(xs, ys));
+    }
+
+    /// ── Address scenario ─────────────────────────────────────────────────
+    ///
+    /// ⚠️ A THIRD scenario, and the first that is not about arithmetic on a
+    /// uint256. `boundary/v1` covers the powers of two because that is where a
+    /// log-shaped function changes behaviour. The same reasoning applied to an
+    /// address-SCORING function points somewhere else entirely: at runs of
+    /// leading nibbles, at the density of one digit, and at the last two bytes.
+    ///
+    /// ⚠️ Why it had to exist rather than reusing `boundary/v1`. That fixture
+    /// set collapses to 478 distinct addresses, and the target returns 0 down
+    /// an early exit for about five sixths of them -- a power of two has a 4 as
+    /// its first nonzero nibble only when k = 2 (mod 4). Two consequences, both
+    /// fatal: the gas reading would mostly be the early exit rather than the
+    /// function, and proof 2b -- which requires a mutation to move at least
+    /// half the scenario -- could not pass for ANY mutation, because the part
+    /// that scores zero scores zero before and after.
+    ///
+    /// ⚠️ What this scenario is NOT tuned to. The scoring family below is built
+    /// around the digit 4 because that is the digit the FUNCTION branches on,
+    /// exactly as `boundary/v1` is built around powers of two. It is not built
+    /// around a mutation: the mutation chosen for this target deliberately
+    /// leaves the digit alone, so that the population which scores at all is
+    /// identical before and after. See manifest-vanity.json.
+    string internal constant NAME_3 = "vanity/v1";
+
+    /// `z` leading zero nibbles, then `c` nibbles of value `d`, then `tail`.
+    /// Every address in this scenario is described by those four numbers, which
+    /// is also how its coverage can be read off without running it.
+    function _addr(uint256 z, uint256 c, uint256 d, uint256 tail) private pure returns (uint256 v) {
+        uint256 rem = 40 - z - c;
+        uint256 run;
+        for (uint256 i = 0; i < c; i++) run = (run << 4) | d;
+        uint256 mask = rem == 0 ? 0 : (uint256(1) << (4 * rem)) - 1;
+        v = (tail & mask) | (run << (4 * rem));
+    }
+
+    function addresses() internal pure returns (uint256[] memory xs) {
+        uint256[4] memory tails = [
+            uint256(0x0000000000000000000000000123456789abcdef0123456789abcdef01234567),
+            uint256(0x000000000000000000000000fedcba9876543210fedcba9876543210fedcba98),
+            uint256(0x0000000000000000000000000000000000000000000000000000000000004444),
+            uint256(0x0000000000000000000000004040404040404040404040404040404040404040)
+        ];
+        uint8[8] memory zs = [0, 1, 2, 3, 4, 6, 8, 12];   // leading zero nibbles
+        uint8[6] memory cs = [1, 2, 3, 4, 5, 6];          // length of the leading run
+        uint8[4] memory ds = [1, 2, 7, 15];               // a first nibble that is not 4
+
+        xs = new uint256[](8 * 6 * 4 + 4 * 4 * 4 + 8);
+        uint256 n;
+
+        // Scoring family: a run of 4s after the leading zeros. Every one of
+        // these contains at least one 4, so every one of them scores.
+        for (uint256 i = 0; i < zs.length; i++) {
+            for (uint256 j = 0; j < cs.length; j++) {
+                for (uint256 t = 0; t < tails.length; t++) xs[n++] = _addr(zs[i], cs[j], 4, tails[t]);
+            }
+        }
+
+        // Early-exit family: the first nonzero nibble is not a 4. The branch is
+        // part of the function's behaviour and a scenario that omitted it would
+        // measure only the expensive half.
+        for (uint256 i = 0; i < 4; i++) {
+            for (uint256 j = 0; j < ds.length; j++) {
+                for (uint256 t = 0; t < tails.length; t++) xs[n++] = _addr(i, 1, ds[j], tails[t]);
+            }
+        }
+
+        xs[n++] = 0;                          // every nibble zero -- the degenerate case
+        xs[n++] = _addr(0, 40, 4, 0);         // every nibble a 4
+        xs[n++] = _addr(0, 40, 15, 0);        // every nibble an f
+        xs[n++] = _addr(0, 4, 4, 0x4444);     // exactly four, plus the trailing bonus
+        xs[n++] = _addr(0, 5, 4, 0x4444);     // more than four, plus the trailing bonus
+        xs[n++] = _addr(8, 4, 4, 0x4444);     // leading zeros, exactly four, trailing bonus
+        xs[n++] = _addr(36, 4, 4, 0);         // the run at the very end of the address
+        xs[n++] = uint256(type(uint160).max); // every nibble an f, the other way round
+        assembly { mstore(xs, n) }
+    }
+
+    /// Identity of the address scenario. Same rule as the other two: it commits
+    /// to the VECTOR, so the label cannot come to mean something else.
+    function digest3() internal pure returns (bytes32) {
+        return keccak256(abi.encode(addresses()));
     }
 
     /// The scenario's identity, and what `scenario_id` in the receipt must carry.

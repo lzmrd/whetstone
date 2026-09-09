@@ -14,13 +14,19 @@ import { fileURLToPath } from 'node:url';
 const run = promisify(execFile);
 const REPO = fileURLToPath(new URL('../../', import.meta.url));
 
-export async function measurePatch(taskHex, patchHex, sig = 'f(uint256)') {
+/**
+ * ⚠️ `scenario` is not derivable from `sig`. boundary/v1 and vanity/v1 are both
+ * one-argument scenarios, and a uint256 argument says nothing about whether it
+ * is a number or a truncated address. Empty means "the default for this arity",
+ * which is what every run before the third scenario existed used.
+ */
+export async function measurePatch(taskHex, patchHex, sig = 'f(uint256)', scenario = '') {
   let out;
   try {
     const r = await run(
       'forge',
       ['test', '--match-contract', 'PatchGasTest', '-vv'],
-      { cwd: REPO, env: { ...process.env, TASK_HEX: taskHex, PATCH_HEX: patchHex, TASK_SIG: sig }, maxBuffer: 32e6, timeout: 600_000 },
+      { cwd: REPO, env: { ...process.env, TASK_HEX: taskHex, PATCH_HEX: patchHex, TASK_SIG: sig, TASK_SCENARIO: scenario }, maxBuffer: 32e6, timeout: 600_000 },
     );
     out = r.stdout;
   } catch (e) {

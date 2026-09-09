@@ -24,7 +24,7 @@ contract DifferentialTest is Test {
     /// ⚠️ Was a constant, and that made every gate below single-argument. The
     /// signature travels with the run now, exactly as it does in the receipt.
     function _plan() internal view returns (Plan.Spec memory) {
-        return Plan.forSig(vm.envOr("TASK_SIG", string("f(uint256)")));
+        return Plan.forSig(vm.envOr("TASK_SIG", string("f(uint256)")), vm.envOr("TASK_SCENARIO", string("")));
     }
 
     /// Calldata for the i-th point of the committed scenario.

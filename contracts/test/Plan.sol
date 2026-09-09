@@ -25,9 +25,37 @@ library Plan {
         uint256[] ys;       // empty for arity 1
     }
 
+    /// The arity default: what every run measured before a scenario could be
+    /// named. Kept as its own entry point so those runs stay byte-identical.
     function forSig(string memory sig) internal pure returns (Spec memory s) {
+        return forSig(sig, "");
+    }
+
+    /// ⚠️ Scenario selection cannot be derived from the signature. `boundary/v1`
+    /// and `vanity/v1` are both one-argument scenarios, and a target that takes
+    /// a uint256 says nothing about whether that uint256 is a NUMBER or a
+    /// truncated ADDRESS. Picking by arity alone would have scored the address
+    /// target on the powers of two -- which is not a smaller scenario, it is
+    /// the wrong one, and it would have failed proof 2b for reasons that had
+    /// nothing to do with the mutation. So the manifest says which, and an
+    /// unrecognised name is refused rather than quietly defaulted.
+    function forSig(string memory sig, string memory scenario) internal pure returns (Spec memory s) {
         s.sel = bytes4(keccak256(bytes(sig)));
         s.arity = _arity(sig);
+        bool named = bytes(scenario).length != 0;
+
+        if (named && _eq(scenario, Scenario.NAME_3)) {
+            require(s.arity == 1, "Plan: vanity/v1 is a one-argument scenario");
+            s.name = Scenario.NAME_3;
+            s.digest = Scenario.digest3();
+            s.xs = Scenario.addresses();
+            return s;
+        }
+
+        require(
+            !named || _eq(scenario, Scenario.NAME) || _eq(scenario, Scenario.NAME_2),
+            "Plan: unknown scenario name"
+        );
 
         if (s.arity == 1) {
             s.name = Scenario.NAME;
@@ -40,6 +68,15 @@ library Plan {
         } else {
             revert("Plan: only 1- and 2-argument targets have a committed scenario");
         }
+
+        // A name that resolves to a different scenario than the one the arity
+        // selected is a manifest error, not something to silently prefer one
+        // way or the other.
+        require(!named || _eq(scenario, s.name), "Plan: scenario does not match the target's arity");
+    }
+
+    function _eq(string memory a, string memory b) private pure returns (bool) {
+        return keccak256(bytes(a)) == keccak256(bytes(b));
     }
 
     /// Number of top-level arguments in a signature like `f(uint256,uint256)`.
