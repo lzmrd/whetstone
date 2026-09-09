@@ -148,6 +148,24 @@ export async function recordRun(receipt, hcs = {}) {
     };
   }
 
+  /**
+   * ⚠️ Every row points to a receipt that exists, with no exception.
+   *
+   * `toRow` defaults a missing pointer to 32 zero bytes, and unscored attempts
+   * used to be written that way deliberately. A reader following the README --
+   * take receiptHash, fetch that message from the mirror node, hash it, compare
+   * -- finds nothing to fetch and cannot tell a documented absence from a lie.
+   * Both entry points publish the receipt for a failed run now; this refuses the
+   * row if one of them ever stops.
+   */
+  if (/^0x0{64}$/.test(row.receiptHash)) {
+    return {
+      recorded: false, tx: null, address: null,
+      reason: 'refusing to write a row whose receiptHash is all zeros: it would point at no ' +
+        'receipt on an append-only log. Publish the receipt to HCS first, or write nothing.',
+    };
+  }
+
   if (!address || !rpc || !signer) {
     const reason = 'RUN_REGISTRY_ADDRESS / BASE_SEPOLIA_RPC_URL / BASE_SEPOLIA_KEYSTORE not set';
     queue(row, reason);

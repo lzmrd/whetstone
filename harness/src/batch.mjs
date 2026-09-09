@@ -103,9 +103,23 @@ for (let seed = 1; seed <= n; seed++) {
     results.push({ seed, ok: false, reason: run.stop_reason, rounds: run.rounds.length, usd: run.usd });
     // ⚠️ A seed that bought inference and produced nothing is still a row: the
     // allocator budgets across providers and money burned is money burned.
+    //
+    // ⚠️ And the receipt IS published, reversing an earlier decision. That
+    // decision said an unscored attempt has no patch to recompute and no
+    // guarantee to label, so publishing a record would publish a result that
+    // does not exist -- and it left `receiptHash` as 32 zero bytes on a public
+    // append-only log. But the row is not silent: it claims this model burned
+    // this much money and failed. Publishing the receipt does not publish a
+    // result, it publishes the evidence for the only claim the row makes. The
+    // reader following the README finds a real message instead of a zero hash
+    // they cannot tell from a bug.
     if (process.env.RUN_REGISTRY_ADDRESS) {
       const failed = await buildReceipt({ run, spec, taskSource, taskPath, payments: run.payments });
-      const reg = await recordRun(failed, {});
+      const ptr = process.env.HCS_TOPIC_ID ? await publishReceipt(failed) : {};
+      if (ptr.mirror && !ptr.mirror.matches) {
+        console.log(`     ⚠️ failed-run receipt seq ${ptr.sequence_number} FAILED read-back`);
+      }
+      const reg = await recordRun(failed, ptr);
       if (!reg.recorded) console.log(`     ⚠️ registry: ${reg.reason}`);
     }
     continue;

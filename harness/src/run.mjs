@@ -153,16 +153,30 @@ receipt      HCS ${ptr.topic_id} seq ${ptr.sequence_number}  (${ptr.bytes} bytes
    * stayed invisible. Found by running the allocator against the live subgraph,
    * where it elected the same broken model twice in a row.
    *
-   * ⚠️ No HCS receipt and no artifact bundle: there is no patch to recompute and
-   * no guarantee to label, so publishing a canonical record would be publishing
-   * a result that does not exist. The row carries scored=false, an empty label,
-   * a zero pointer, and the cost.
+   * ⚠️ No artifact bundle -- there is no patch to recompute -- but the receipt
+   * IS published, which reverses what this comment used to say.
+   *
+   * The old reasoning was that an unscored attempt has no result, so publishing
+   * a canonical record would publish a result that does not exist. It left
+   * `receiptHash` as 32 zero bytes on a public append-only log, and a third
+   * party following the README's verification procedure could not distinguish
+   * "no receipt by design" from "these people are lying".
+   *
+   * The row is not silent about anything. It claims a model burned this much
+   * money and produced nothing. Publishing the receipt publishes the evidence
+   * for exactly that claim -- no guarantee label, no gas figures, because there
+   * are none -- and the invariant "every row points to a real receipt" holds
+   * without an exception nobody can see from the outside.
    */
   const failed = await buildReceipt({
     run, spec, taskSource: prepared.taskSource, taskPath,
     payment: run.payments?.[0] ?? null, payments: run.payments,
   });
-  const reg = await recordRun(failed, {});
+  const ptr = process.env.HCS_TOPIC_ID ? await publishReceipt(failed) : {};
+  if (ptr.mirror && !ptr.mirror.matches) {
+    console.log(`\nreceipt      seq ${ptr.sequence_number} FAILED read-back`);
+  }
+  const reg = await recordRun(failed, ptr);
   if (reg.recorded) {
     console.log(`\nregistry     unscored attempt recorded — ${failed.cost?.usd_list ?? '?'} USD burned`);
     console.log(`             tx ${reg.tx}`);

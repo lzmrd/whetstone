@@ -112,14 +112,41 @@ Kept current as code lands. `H` = hand-written, `A` = AI-generated, `HA` = AI-as
 | `scripts/bootstrap.sh` | HA | Pinned toolchain provisioning, sha256-verified |
 | `contracts/src/tasks/NegativeControl.sol` | HA | The mutation proof 2b must refuse |
 | `harness/src/prices.json` | **H** | Prices transcribed by hand from the published page; source URL, date and sha256 recorded in the file |
-| **the mutation `M`** (`contracts/src/tasks/Task.sol`, `Baseline.sol`) | ⚠️ **A** — model-written | Written by Claude on 7 September at the builder's explicit instruction. See below |
+| **the mutation for `log256-bytelen/v1`** (`contracts/src/tasks/Task.sol`, `Baseline.sol`) | ⚠️ **A** — model-written | Written by Claude on 7 September at the builder's explicit instruction. See below |
+| **the mutation for `satmul-halved/v1`** (`contracts/src/tasks/satmul/`) | **H** — builder-chosen | Chosen by the builder on 9 September from five candidates presented in prose with their measured divergence. The Solidity and assembly transcription is Claude's. See below |
+| `contracts/test/Plan.sol`, the two-argument path in the instrument | HA | Signature-driven scenario selection |
 
-### ⚠️ The mutation is model-written, and that weakens a claim this project made
+### ⚠️ There are two mutations now, and they have different authors
 
-`M` — *the result is the number of bytes needed to represent `x` rather than the
-index of its highest non-zero byte, and zero reverts instead of returning a
-value* — was written by Claude, not by the builder. The builder was offered the
-choice, understood the trade-off, and chose this.
+⚠️ This section said *"the mutation"*, singular, and attributed it to Claude.
+That was accurate for one task and became imprecise the moment there were two.
+Both are described below, because the difference between them is the substance
+of this whole document.
+
+**`log256-bytelen/v1` — model-written.** `M` — *the result is the number of bytes
+needed to represent `x` rather than the index of its highest non-zero byte, and
+zero reverts instead of returning a value* — was written by Claude, not by the
+builder. The builder was offered the choice, understood the trade-off, and chose
+this.
+
+**`satmul-halved/v1` — builder-chosen.** *The saturating product, halved.* Five
+candidate mutations were presented in prose, each with the fraction of the
+committed scenario it moved, measured before any of them existed as code. Two
+were already dead on arrival — changing only the overflow behaviour moves 29.5%
+of the scenario, because just 426 of the 1 444 committed pairs overflow, and
+proof 2b requires 50%. A third was rejected for adding an addition, which is
+overflow-checked in Solidity and unchecked in assembly: the asymmetry that put
+24% of the log256 denominator inside the mutation itself ([Addendum 10](spec/spike/DAY1-RESULTS.md)).
+The builder picked from what survived. Claude wrote the Solidity and the
+assembly that express the choice on both sides.
+
+⚠️ **This is a real difference, and it is also a narrow one.** The decision about
+what makes the task hard is the builder's; the *menu it was chosen from* was
+assembled by Claude, and a menu is a form of authorship. Four mutations written
+this way would not be four independent tasks — they would be one model's sense of
+what a mutation looks like, filtered four times through a human yes/no. Removing
+the author from the loop is what the procedural mutation engine is for, and it is
+roadmap, not built.
 
 **Why it matters enough to have its own section.** R2 named `M` as the human
 artifact of Track S, and the argument for it was not paperwork: `M` is the
@@ -139,8 +166,10 @@ verifiable regardless of who typed it:
 - `gas(Baseline) < gas(Candidate)` holds on every one of the 768 scored inputs,
   so `M` did not damage the third-party efficiency anchor
 
-**What does not survive.** Nothing in this repository is now a substantial
-hand-written human artifact. The honest description of the human contribution is
+**What does not survive** — for the log256 task, and now with one exception.
+`satmul-halved/v1` carries a human decision at the point R2 cares about. For
+everything else, nothing in this repository is a substantial hand-written human
+artifact. The honest description of the human contribution is
 **direction, constraint and rejection** — the questions that changed the
 architecture (recorded in [spec/DECISIONS.md](spec/DECISIONS.md)), the refusal of
 weak claims, the commissioning of four adversarial reviews — plus the pinned
