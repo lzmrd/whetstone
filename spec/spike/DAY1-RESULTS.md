@@ -776,3 +776,24 @@ So the second task is no longer blocked by a prover. It is blocked by the
 times, each time plausibly. Extending it is mechanical, but it is not the kind of
 change to make quickly, and its acceptance gate is not "it compiles": the order
 control must still read 0 and `log256` must still measure 66 gas/call afterwards.
+
+## ⚠️ Addendum 11a — written and overtaken the same night
+
+The instrument was extended within hours of the paragraph above, against exactly
+that gate: published receipt `mtsp6qan` reproduces field for field including its
+digest, `log256` still measures 66 gas/call, and the order control reads 0 on the
+two-argument path as well as the one-word path. `satmul-halved/v1` was built on
+it the same evening.
+
+The paragraph is kept rather than edited, because the sequence is the finding.
+Three constraints were named as *the* constraint in turn — symbolic tractability,
+then the arity of the instrument, then the arithmetic of the gas gap — and each
+looked like a property of the world until it was measured. What actually binds
+now is neither: it is that every mutation is hand-written by one author, and that
+runs cost machine time. Both were visible from the start and neither was named.
+
+⚠️ And the next one down was hiding behind those: `max` and `min` are provable
+and have 59 gas/call of headroom **unmutated**, and 9 after. On functions that
+small the gap comes from a branchless ternary against four bytes of assembly, and
+any wrapper the mutation adds equalises the two. Headroom before the mutation
+predicts nothing; it has to be measured after, on every candidate.

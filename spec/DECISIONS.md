@@ -143,6 +143,20 @@ The risk is not the prize money: a single project is submitted to multiple track
 
 **Rejected**: keeping cross-family dispersion in scope. It is the measurable countermeasure against models specializing to the mutation scheme, and losing it is a real cost — recorded in the limits rather than quietly dropped.
 
+⚠️ **Update, 9 September — the reason given here was not the reason.** Two tasks
+exist (`log256-bytelen/v1` and `satmul-halved/v1`) and the cost per task is not
+what this decision assumed. The rationale was "each function requires two
+hand-written artifacts and two proofs, done serially", but the funnel had never
+been enumerated: eleven untested OZ↔solady pairs, **eight of them provable**
+([Addendum 11](spike/DAY1-RESULTS.md)). What actually kept the count at one was a
+`bytes4` constant and a 36-byte buffer in three test files — the instrument
+measured `f(uint256)` and nothing else, so every provable candidate but one was
+invisible.
+
+The scope cut was right; its stated reason was a guess that held for two days
+because nobody measured it. What binds now is that every mutation is hand-written
+by one author, and that runs cost machine time.
+
 ---
 
 ## D-12 · Track S and Track H are separate architectures
@@ -203,3 +217,41 @@ Instrument 2's bias, measured by running the same comparison in both orders: **5
 ⚠️ **The repair is deliberately deferred.** Both candidates — a `solady_M + clz` baseline, or compiling to `cancun` and declaring the divergence from OpenZeppelin's own `foundry.toml` — invalidate every gas figure already published. Changing the denominator two days before submission would produce numbers with less scrutiny behind them than the ones they replace. The honest move is to publish the flaw at full strength and leave the numbers standing beside it.
 
 **What this costs**: `relative_progress` cannot be read as "fraction of the expert gap closed by the model". It is a fraction of the gap between OpenZeppelin's implementation and a 2024 expert implementation, closed by a model with a 2026 instruction set. Absolute `gas/call` and the comparison against the trivial floor are unaffected — neither involves the baseline.
+
+---
+
+## D-16 · A task climbs the same ladder its patches climb
+
+**Decided**: `prepareTask` admits a task whose proofs cannot be discharged by the
+prover, provided gate 1 (the committed scenario) and gate 2 (20 001 fuzz runs)
+both pass — and that admission **caps every run scored on that task** at `FUZZED`.
+
+**Why**: the project had two standards and applied the weaker one to the code it
+judges. A model's patch climbs three rungs — prover, gate 1, gate 2 — and a patch
+that reaches only the second is accepted and labelled `FUZZED`. The task's own
+setup had one rung: proof 1 and proof 3 demanded a proof or nothing.
+
+That was never argued for, and it was not neutral. It silently excluded every
+target where hevm does not terminate, which is precisely the string-building
+family — the one with two orders of magnitude more headroom than `log256`, and
+the only place the four-label vocabulary could ever print a second label. **A
+rule that decides which functions exist is a claim about the world, and this one
+was never stated.**
+
+**The cap is the part that makes it honest.** hevm proving a particular patch
+equivalent to its task is a real result. Publishing `FORMAL` for it beside a
+baseline established only by fuzzing would name the strongest link in a chain
+whose weakest link is weaker, and a reader relies on the whole chain.
+`clampLabel()` enforces it and four tests cover it, including that case.
+
+**Also decided**: proof 2 tolerates `UNKNOWN`, and only because proof 2b is
+strictly stronger than what proof 2 asks. Proof 2 is an existence claim — some
+input makes task and original differ. Proof 2b executes both on every point of
+the committed scenario and counts, so the divergence is exhibited concretely
+rather than asserted by a solver that did not finish. ⚠️ A **proved** proof 2
+still kills the task: that means the mutation is cosmetic, and no amount of
+fuzzing overrides a refutation in either direction.
+
+**What this does not change**: a proof is still a proof and evidence is still
+evidence. The level is recorded, travels into the receipt, and the leaderboard
+prints it beside the number.

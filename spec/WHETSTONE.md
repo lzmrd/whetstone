@@ -452,25 +452,47 @@ scored — but "one of these four, never anything else" was written while the co
 returned five, and the honest fix is to name the fifth rather than to pretend the
 sentence was true.
 
-### ⚠️ Status: this vocabulary currently prints ONE label
+### ⚠️ Status: this vocabulary still prints ONE label, for a different reason
 
 This document says three times that a guarantee vocabulary which always prints
-the same label is decoration. By its own standard, today it is:
+the same label is decoration. By its own standard, today it still is:
 
 | Label | Emitted? |
 |---|---|
-| `FORMAL_NO_EXPLICIT_INPUT_BOUND` | **22 of 22** scored runs |
-| `FORMAL_BOUNDED` | never — the harness always passes `--max-iterations -1`, so the bounded branch is unreachable in practice |
-| `FUZZED` | never — reachable only when hevm returns `UNKNOWN`, which `log256` never does |
-| `UNKNOWN` | never on the scored target |
+| `FORMAL_NO_EXPLICIT_INPUT_BOUND` | **31 of 31** scored runs |
+| `FORMAL_BOUNDED` | never — the harness always passes `--max-iterations -1` |
+| `FUZZED` | never in production, though the machinery is exercised by `selfcheck.sh` |
+| `UNKNOWN` | never on a scored target |
 
-The label that would exercise the rest of the vocabulary is `toHexString`, where
-hevm does not terminate — and it is a stretch target that has not been built. So
-the machinery for all four exists and is tested ([`selfcheck.sh`](../scripts/selfcheck.sh)
-asserts all three directions, including that an incomplete exploration cannot earn
-a FORMAL label), but the *evidence* that it discriminates in production is one
-label wide. Recorded here rather than left for a reader to derive from the batch
-files.
+⚠️ **What changed is the reason, and the old one was our own rule.** This section
+used to say the label that would exercise the vocabulary is `toHexString`, "a
+stretch target that has not been built". It had not been built because it *could
+not* be: proof 1 and proof 3 demanded that hevm terminate, and on a
+string-building function it does not.
+
+That demand was an asymmetry nobody had argued for. A model's patch climbs a
+ladder — prover, then gate 1 over the committed scenario, then gate 2 over 20 001
+fuzz runs — and a patch reaching only the second rung is accepted as `FUZZED`.
+The task's own setup had a single rung. The project applied its weaker standard
+to the code it judges and its stronger one to the code it writes, and the effect
+was not neutral: it excluded every target with real headroom.
+
+| Target | Headroom, gas/call |
+|---|---|
+| `toChecksumHexString` | **15 671** |
+| `toHexString(address)` | 8 608 |
+| `toHexString(uint256)` | 4 044 |
+| `base64` | 786 |
+| `toString` | 454 |
+| `log256` — the target in production | **66** |
+
+[D-16](DECISIONS.md) removes the asymmetry: a task may be admitted on gates 1 and
+2, and doing so **caps every run scored on it** at `FUZZED`. So the remaining
+distance to a second label is a mutation and its proofs, not a rule.
+
+⚠️ Recorded here rather than left for a reader to derive from the batch files —
+and stated as one label until a run actually earns the other. The rule being
+fixed is not the vocabulary discriminating in production.
 
 ⚠️ Never write *"proven, no bounds"*. The EVM word is already 256-bit, the wrapper narrows the domain, the solver uses heuristics. hevm proves **bytecode** equivalence: imports, linking, ABI encoding, dispatcher, optimizer, metadata, solc version and wrapper parameters **must be serialized into the receipt**, or the label means nothing.
 

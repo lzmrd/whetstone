@@ -249,6 +249,107 @@ label collided with its caption, and the page promised a link to the Base Sepoli
 transaction while rendering only the Hedera one. The transaction was already in
 `Run.id` — it was simply never queried.
 
+## ✅ Wednesday 9, evening — the benchmark stops being one function
+
+Four findings, in the order they were forced out, because the order is the point.
+
+**The candidate funnel had never been enumerated.** The scope cut to one function
+rested on a hand-picked table of seven candidates that over-sampled hard ones —
+`mulDiv`, `sqrt`, two string builders. Enumerating the arithmetic surface the two
+libraries actually share gives eleven untested pairs and **eight are provable**
+([Addendum 11](spike/DAY1-RESULTS.md)). Symbolic tractability was never the
+constraint; the sample was.
+
+**`clz` had the most headroom and is disqualified.** 240 gas/call, one argument,
+every gate would have worked unchanged. Measured before writing the mutation: the
+Osaka `CLZ` opcode is **provably equivalent to the whole OZ function** and beats
+the expert baseline by 151 gas/call, so a model scores 163% of baseline with one
+instruction. The target would measure knowledge of EIP-7939. That is
+[D-15](DECISIONS.md) at full strength, and choosing it after knowing would make it
+deliberate rather than inherited.
+
+**The instrument, not the prover, was the limit.** `bytes4 SEL = f(uint256)` and
+`new bytes(36)`, copied into three test files. Every provable candidate but
+`log256` takes two arguments. Extended against a gate that was not "it compiles":
+published receipt `mtsp6qan` reproduces field for field including its digest,
+`log256` still measures 66 gas/call, order bias 0 on the new path as well as the
+old one — and the two-argument path arrived with its own order control, per
+[D-14](DECISIONS.md).
+
+**A second task exists, and the builder chose what makes it hard.**
+`satmul-halved/v1` — saturating multiplication, halved. Five candidate mutations
+were presented in prose with their measured divergence *before* any was written
+as code; two were dead on arrival (changing only the overflow result moves 29.5%
+of the scenario, and proof 2b needs 50%), a third was rejected for adding an
+addition — checked in Solidity, unchecked in assembly, the asymmetry
+[Addendum 10](spike/DAY1-RESULTS.md) found inside the log256 denominator.
+
+```
+proof 1  baseline == task      FORMAL      proof 2b  1296/1444 = 89.8%
+proof 2  task != original      REFUTED     proof 3   trivial == task  FORMAL
+headroom 152 gas/call          floor 42
+```
+
+⚠️ Unlike `log256`, where the one-word floor (69) **exceeds** the OZ-to-solady gap
+(66), there is room between a mechanical deletion and the expert implementation.
+That is why 4 of 4 runs never beat the floor on the old target.
+
+## ✅ The admission asymmetry — [D-16](DECISIONS.md)
+
+A model's patch climbs three rungs; the task's own setup had one. The weaker
+standard was applied to the code we judge and the stronger one to the code we
+write, and it excluded every target with real headroom. Fixed, with a cap: a task
+admitted on gates 1 and 2 caps every run scored on it at `FUZZED`.
+
+⚠️ **The vocabulary still prints one label.** The rule being fixed is not the
+vocabulary discriminating in production, and [WHETSTONE §7](WHETSTONE.md) says so
+until a run actually earns the second one.
+
+## Measured dead, so nobody re-proposes them
+
+| Candidate | Why not |
+|---|---|
+| `log2` | first four lines identical to `log256` — two rows, one observation |
+| `sqrt` | `std::bad_alloc`, and bounding exploration to 3 iterations crashes too |
+| `log10` | `UNKNOWN` after 900 s of solver, 2 queries unresolved |
+| `clz` | one opcode beats the expert baseline by 151 gas/call |
+| `average`, `abs` | 2 and 0 gas/call of headroom |
+| `ceilDiv`, signed `average` | **REFUTED** — OZ and solady genuinely disagree |
+| `max`, `min` | 59 gas/call unmutated, **9 after the mutation** |
+| `popCount`, `fls`, `ffs` | no OpenZeppelin counterpart, so no baseline |
+| `base58` | ⚠️ **−551 gas/call: OpenZeppelin is FASTER than solady**, so the denominator would be negative |
+
+⚠️ `max`/`min` is the lesson worth keeping: **headroom before the mutation
+predicts nothing.** It has to be measured after, on every candidate.
+
+## Findings the work forced out, not the plan
+
+| | |
+|---|---|
+| a missing `hevm` returned `UNKNOWN`, which the patch path turns into `FUZZED` — a guarantee label published with no prover involved | now a harness error |
+| `differential()` returned `{passed:false}` for **any** non-zero forge exit, so a permissions error was indistinguishable from "the patch diverges" — on chain, as a model failure | gate must fire, or it throws |
+| the receipt read its scenario name by regex over `Scenario.sol`, matching the first hit — every `satmul` run would have claimed `boundary/v1` while reporting the `pairs/v1` digest | reported by the measurement |
+| `RECOMPUTE.md` hardcoded `--sig 'f(uint256)'` — every reader of a `satmul` bundle would have asked hevm about a function the run never used | carried in the receipt |
+| the keystore import script **echoed the private key** into the session transcript | ECHO off on the pty; four failed attempts recorded in `scripts/_pty_import.py` |
+
+## Bugs from the external review
+
+Closed: **B1** (the refutation test matched the word *calldata* and ran before the
+pass test), **B2** (HCS chunks decoded individually then joined, corrupting any
+multi-byte character across the 1024-byte boundary — three tests show the old
+path corrupts and the new one does not), **B3** (no subprocess had a wall clock),
+**B4** (the gateway bound 0.0.0.0 while printing 127.0.0.1), **B9** (private key
+in `cast`'s argument vector, where `/proc/<pid>/cmdline` is world-readable),
+**B10** (unscored rows pointed at 32 zero bytes), **B13**, **B15**, **B6**, **B19**.
+
+Open and declared: **B8** (the budget compares list-price estimate, never
+`hbar_paid`), **B11** (attribution by regex over error text), **B14** (rounding
+conventions differ between receipt and registry), **B20** (no CI).
+
+⚠️ **B5 and B7 were false** — the reviewer read an older checkout. `attribution.test.mjs`
+exists and exercises `attributeFailure` in 7 assertions; the README block quoted
+as claiming the registry was missing says the opposite at HEAD.
+
 ## Thursday 10 — freeze and record
 
 5. Multi-seed batch across the usable models.
