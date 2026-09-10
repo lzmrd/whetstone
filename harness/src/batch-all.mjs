@@ -141,9 +141,15 @@ function taskIdOf(manifestPath) {
  * applied to the whole toolchain, at the entry point that runs longest.
  */
 function requireToolchain() {
+  // ⚠️ Per-tool version flags, because they are NOT the same and guessing
+  // costs the whole pass: `hevm --version` is an error, hevm wants `version`.
+  // The first launch of this pass refused to start, reporting hevm missing on a
+  // machine where hevm was installed and on PATH -- a preflight built to
+  // prevent a confusing failure, producing one.
+  const PROBE = { solc: ['--version'], forge: ['--version'], cast: ['--version'], hevm: ['version'] };
   const missing = [];
-  for (const bin of ['solc', 'forge', 'hevm', 'cast']) {
-    try { execFileSync(bin, ['--version'], { stdio: 'ignore' }); }
+  for (const [bin, args] of Object.entries(PROBE)) {
+    try { execFileSync(bin, args, { stdio: 'ignore' }); }
     catch { missing.push(bin); }
   }
   if (missing.length) {
