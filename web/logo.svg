@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="512" height="512"
+     role="img" aria-label="Whetstone">
+  <!-- Whetstone. The blade rests on the stone at a honing angle; the stone
+       carries the colour this project gives to a saving, because Whetstone is
+       the stone and the model is what gets drawn across it. -->
+  <rect width="32" height="32" rx="6" fill="#F1F2EF"/>
+  <g transform="translate(0,-1.4)">
+    <path d="M4.5 21.4 L27 13.6 L27 8.4 Z" fill="#15181A"/>
+    <rect x="3" y="21.4" width="26" height="5" rx="1" fill="#1E6F5C"/>
+  </g>
+</svg>
