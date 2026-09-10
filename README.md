@@ -8,7 +8,7 @@ It runs open-weight models on Solidity optimisation tasks, charges and records e
 
 The aim is not to crown a “best model”. It is to show the evidence a credible AI-code-optimisation result needs.
 
-⚠️ **Status — vertical slice, not a benchmark yet.** Four hand-built tasks are gated and ready; the measured results so far come from one of them, over a handful of seeds. The pipeline runs end to end. That is enough to demonstrate the method; it is not enough to rank models. A real task corpus and a statistically meaningful sample are future work.
+⚠️ **Status — vertical slice, not a benchmark yet.** Four hand-built tasks are gated and ready; the measured results so far come from one of them, over a handful of seeds. The pipeline runs end to end. That is enough to demonstrate the method; it is not enough to rank models. A real task corpus and a statistically meaningful sample are future work, and the next candidates are named rather than gestured at: the v4-core math libraries, screened and recorded in [the specification](spec/WHETSTONE.md).
 
 Built for [ETHOnline 2026](https://ethglobal.com/events/ethonline2026), Start Fresh track.
 

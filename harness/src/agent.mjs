@@ -16,7 +16,7 @@ import { createHash } from 'node:crypto';
 import { SYSTEM_PROMPT, PROMPT_HASH, assertClean, stripComments } from './prompt.mjs';
 import { extractSolidity } from './extract.mjs';
 import { compileToRuntime, PINS } from './compile.mjs';
-import { equivalent, counterexampleFor } from './equivalence.mjs';
+import { equivalent, counterexampleFor, WALL_MS_HOSTILE } from './equivalence.mjs';
 import { measurePatch } from './gas.mjs';
 import { signPayment } from './pay.mjs';
 import { differential, fuzzCampaign } from './differential.mjs';
@@ -463,7 +463,11 @@ export async function runAgent({
         });
       } else {
         // ── gate 3: does it still do the same thing? ────────────────────
-        const eq = await equivalent(built.path, taskBuild.path, sig);
+        // A short clock when the task's own proofs already defeated hevm. See
+        // WALL_MS_HOSTILE: one such call ran 21 minutes without terminating,
+        // and eight rounds of that is four hours per seed.
+        const eq = await equivalent(built.path, taskBuild.path, sig,
+          prepared.task_guarantee === 'FUZZED' ? { wallMs: WALL_MS_HOSTILE } : {});
         if (eq.equivalent === true) {
           // ⚠️ Cross-check, not ceremony. A formal proof subsumes fuzzing, so a
           // DISAGREEMENT here cannot be a property of the patch -- it means our

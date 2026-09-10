@@ -785,6 +785,71 @@ Ratchet · procedural mutation engine · cross-family dispersion. All roadmap.
 
 ⚠️ **The control family was on this list and one member of it was built after all**, because the schedule allowed it — and it **falsified the result it was built to test**. With a cost-neutral cosmetic control the semantic mutation and the control are indistinguishable (70.7% against 75.4% of baseline, overlapping ranges): a tie, which D-13 says is the normal outcome at n=5. The earlier claim of 99.9% against 13.9% is **retracted** ([Addendum 9](spike/DAY1-RESULTS.md)). It is one control, not the family. The hand-written mutation `M` stays: without it there is no anti-memorization defence, and its required refutation (§4) is the only machine-checked part of that defence.
 
+### Future work — the v4-core math libraries
+
+⚠️ Screened on 10 September against the real sources at `Uniswap/v4-core@main`,
+not reasoned about. Every one is **MIT** — the "restrictive licence" that scoped
+four days of this project away from them was false, and the correction is on
+[D-07](DECISIONS.md).
+
+| candidate | arity | imports | fits the instrument today |
+|---|---|---|---|
+| `BitMath.mostSignificantBit(uint256)` | 1 | **0** | ✅ and `boundary/v1` is already its domain |
+| `TickMath.getSqrtPriceAtTick(int24)` | 1 | 2 (BitMath, CustomRevert) | ✅ arity; needs a tick-domain scenario |
+| `TickMath.getTickAtSqrtPrice(uint160)` | 1 | 2 | ✅ arity; needs a price-domain scenario |
+| `FullMath.mulDiv(a, b, denominator)` | **3** | 0 | ❌ the instrument holds 1 and 2 |
+| `SqrtPriceMath.getNextSqrtPriceFrom*` | 3-4 | 4 | ❌ |
+
+**Why they are worth the work, and it is not the obvious reason.** They are
+gas-heavy, but this project does not need a wasteful original: the deficit is
+*created* by the mutation and the model is asked to recover it, which works on
+already-optimal code. What these give us is the thing the corpus currently
+lacks — **an expert baseline written by a third party**. The `vanity` baseline
+is ours, declared in its manifest as that task's one methodological weakness:
+the denominator is our own work. Uniswap's TickMath *is* the expert
+implementation, standing in the same relation to a mutated task as solady does
+for OpenZeppelin.
+
+**`getTickAtSqrtPrice` is the one to reach for first, and for a reason nothing
+else in the corpus can offer.** It has **no loops** — fourteen assembly blocks,
+straight-line. Every target here with real headroom is capped at `FUZZED`
+because hevm cannot fit it, and §7 says plainly that the vocabulary has never
+printed its second label in production. Loop-free code is exactly where hevm
+terminated (`log256`). This is the plausible first `FORMAL`.
+
+**Two obstacles that are not visible from the source.**
+
+⚠️ **`mulDiv` is in the forbidden-token list** (`prompt.mjs`). Any task source
+containing that string is refused by `assertClean` before it reaches a model.
+Surmountable — every task is already renamed to `f` — but it has to be handled
+deliberately rather than discovered halfway.
+
+⚠️ **`mulDiv`-shaped code is already known to defeat the prover here.** Risk 1
+in §14 records bitwuzla exhausting memory on OpenZeppelin's `Math.mulDiv` both
+unconditionally and on a guarded domain. `FullMath.mulDiv` is the same 512-bit
+algorithm, so it should be planned as a `FUZZED` target from the start, not
+hoped into a proof.
+
+### Future work — why the historical pair is not a task, but a mode
+
+The stretch candidate above is worth keeping, and it has a structural problem
+that must be designed for rather than discovered:
+
+⚠️ **A historical `before`/`after` pair is EQUIVALENT** — that is what makes it
+an optimization. But proof 2 requires the task to **differ** from the original,
+and `prepareTask` throws when hevm reports them equivalent. The pipeline cannot
+ingest a historical pair as it stands.
+
+So Track H is not a task to add to the corpus. It is a second mode with an
+**inverted proof obligation**: where a mutated task must be refuted against its
+original, a historical task must be *proved* equivalent to its predecessor, and
+the thing being scored is the gas gap between two implementations that a human
+already closed. Same instrument, same scenario machinery, different admission
+rule — and a `CONTAMINATED` label that keeps it out of any column shared with
+Track S.
+
+---
+
 ---
 
 ## 14. Risks

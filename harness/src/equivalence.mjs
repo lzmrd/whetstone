@@ -37,6 +37,26 @@ const ANSI = /\x1B\[[0-9;]*[mK]/g;
 const WALL_MS = 30 * 60 * 1000;
 
 /**
+ * The wall clock for a task hevm has ALREADY failed to fit.
+ *
+ * Measured, not guessed, and it was costing the whole pass. On a D-16 task one
+ * patch-equivalence call ran 21 minutes and was still going -- not out of
+ * memory, just exploring without end, which is the behaviour the 30-minute
+ * clock above exists to bound. At eight rounds that is four hours per seed, and
+ * a 34-pair pass would never finish.
+ *
+ * What makes a short clock right rather than merely convenient: a task admitted
+ * under D-16 was admitted BECAUSE hevm could not establish its own proofs 1 and
+ * 3 -- the simpler question, on smaller code. A model's patch is not the easier
+ * case. Spending thirty minutes per round re-asking a question already answered
+ * is not diligence, it is a tax with no expected return.
+ *
+ * The attempt is still made, because the ladder's top rung must be tried before
+ * falling to gates 1 and 2. It is made cheaply.
+ */
+export const WALL_MS_HOSTILE = 60 * 1000;
+
+/**
  * Memory ceiling for one hevm invocation.
  *
  * ⚠️ The wall clock above bounds TIME and nothing bounded MEMORY, which is the
@@ -129,7 +149,7 @@ export function classifyKill(e, elapsedMs, wallMs = WALL_MS) {
  *   label: FORMAL_NO_EXPLICIT_INPUT_BOUND | FORMAL_BOUNDED | REFUTED | UNKNOWN
  *   equivalent: true (proved) | false (counterexample) | null (neither)
  */
-export async function equivalent(fileA, fileB, sig, { timeout = 300, maxIterations = -1 } = {}) {
+export async function equivalent(fileA, fileB, sig, { timeout = 300, maxIterations = -1, wallMs = WALL_MS } = {}) {
   const args = [
     'equivalence',
     '--code-a-file', fileA,
@@ -146,7 +166,7 @@ export async function equivalent(fileA, fileB, sig, { timeout = 300, maxIteratio
   let out;
   const startedAt = Date.now();
   try {
-    const r = await run(cmd, argv, { maxBuffer: 64 * 1024 * 1024, timeout: WALL_MS });
+    const r = await run(cmd, argv, { maxBuffer: 64 * 1024 * 1024, timeout: wallMs });
     out = `${r.stdout}${r.stderr}`;
   } catch (e) {
     // ⚠️ Two different non-zero exits, and they must NOT be conflated.
@@ -171,7 +191,7 @@ export async function equivalent(fileA, fileB, sig, { timeout = 300, maxIteratio
           `and source .envrc.sh.`,
       );
     }
-    const kill = classifyKill(e, Date.now() - startedAt);
+    const kill = classifyKill(e, Date.now() - startedAt, wallMs);
     if (kill === 'memory') {
       return {
         label: 'UNKNOWN',
@@ -187,7 +207,7 @@ export async function equivalent(fileA, fileB, sig, { timeout = 300, maxIteratio
       return {
         label: 'UNKNOWN',
         equivalent: null,
-        output: `hevm exceeded the ${WALL_MS / 1000}s wall clock and was killed. No verdict.`,
+        output: `hevm exceeded the ${wallMs / 1000}s wall clock and was killed. No verdict.`,
       };
     }
     out = `${e.stdout ?? ''}${e.stderr ?? ''}` || e.message;
