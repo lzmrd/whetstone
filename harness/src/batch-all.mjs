@@ -35,16 +35,21 @@ const HARNESS = fileURLToPath(new URL('../', import.meta.url));
  * every model on it is a row that can be published; four tasks at 40% are an
  * anecdote.
  *
- * vanity leads because it is the only target whose trivial floor does not eat
- * the headroom (1 399 against 14 137, 9%), so it is where models can actually
- * separate. log256 is last because its floor EXCEEDS the whole gap: what it
- * produces is already known, and what it produces is ties.
+ * vanity leads because its one-word floor takes the smallest share of the room
+ * available -- 1 400 of 14 137, 10%, against 24-28% for the other three -- so it
+ * is where a model has the most to demonstrate. log256 is last because it is
+ * the smallest in absolute terms (284 gas of room) and already has published
+ * runs, so it is the one whose absence costs least.
+ *
+ * ⚠️ All four numbers were re-measured on 10 September. The figures previously
+ * written here for hexaddr, copied from satmul, were wrong by a factor of 54:
+ * its headroom is 8 180, not 152.
  */
 const TASKS = [
-  { manifest: 'contracts/src/tasks/manifest-vanity.json',  why: 'headroom 14 137, floor 9% -- the only task that can separate models' },
-  { manifest: 'contracts/src/tasks/manifest-hexaddr.json', why: 'headroom 152, floor 42' },
-  { manifest: 'contracts/src/tasks/manifest-satmul.json',  why: 'headroom 152, floor 42' },
-  { manifest: 'contracts/src/tasks/manifest.json',         why: 'log256 -- floor exceeds the gap; kept for continuity with the published runs' },
+  { manifest: 'contracts/src/tasks/manifest-vanity.json',  why: 'headroom 14 137, one-word floor 1 400 = 10% of it -- the best-shaped task in the corpus' },
+  { manifest: 'contracts/src/tasks/manifest-hexaddr.json', why: 'headroom 8 180, floor 2 240 = 27%' },
+  { manifest: 'contracts/src/tasks/manifest-satmul.json',  why: 'headroom 152, floor 42 = 28%' },
+  { manifest: 'contracts/src/tasks/manifest.json',         why: 'log256 -- headroom 284, floor 69 = 24%; kept for continuity with the published runs' },
 ];
 
 /**

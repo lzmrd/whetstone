@@ -196,11 +196,18 @@ tr.benched td{color:var(--rule)}
   </div>
 
   <h2 class="ask">Question 2 — was the saving worth anything?</h2>
-  <p>Wrapping the last line in <code>unchecked</code> removes an overflow check the compiler
-  cannot prove unreachable. That single word saves <b>69 gas per call</b> and requires
-  understanding nothing about what the function does. It is the line every result is read
-  against — a patch below it beat nothing but the compiler's caution.</p>
-  <p style="font-size:.84rem">Vertical axis: gas saved per call, against the code the model was given.</p>
+  <p>Every task carries a <b>one-word edit</b>: a change that requires understanding nothing
+  about what the function does — usually wrapping a line in <code>unchecked</code>, so the
+  compiler stops emitting an overflow check it cannot prove unreachable. Whatever that one
+  word recovers is the line every result is read against. A patch below it beat nothing but
+  the compiler's caution.</p>
+  <p>The tasks are not the same exercise, and they are not on the same scale. The right-hand
+  column is the one to read: where the one word already takes most of the available room,
+  there is little left for a model to demonstrate.</p>
+  <div class="scroll"><table id="tasks"><tbody><tr><td class="state">loading…</td></tr></tbody></table></div>
+  <p style="font-size:.84rem">Vertical axis: gas saved per call, against the code the model was
+  given. One task at a time, because a gas figure from one task means nothing beside a gas
+  figure from another.</p>
   <div id="plot" class="state">loading runs…</div>
 
   <h2 class="ask">Who gets the next paid call?</h2>
@@ -209,6 +216,12 @@ tr.benched td{color:var(--rule)}
   gas per dollar, unless the model has produced two undecided proofs or two failed attempts in
   a row, in which case it is set aside. Spend counts attempts that returned nothing, because
   money burned is money burned.</p>
+  <p><b>⚠️ This table pools every task, and the policy reading it does too.</b> Gas saved is
+  summed across exercises whose scales differ by two orders of magnitude, so a model that drew
+  more of the roomy task will lead on totals without being better. It is shown pooled because
+  that is genuinely what the allocator reads — showing a tidier version here than the policy
+  actually uses would misrepresent the one component this project claims is data-driven.
+  Per-task figures are in the table above and in the run list below.</p>
   <div class="scroll"><table id="models"><tbody><tr><td class="state">loading…</td></tr></tbody></table></div>
 
   <h2 class="ask">Check any row without trusting this page</h2>
@@ -241,9 +254,32 @@ tr.benched td{color:var(--rule)}
 
 <script>
 const URL_ = "https://api.studio.thegraph.com/query/115254/whetstone/v0.0.2";
-// The floor comes from proof 3 in the receipt, not from the registry event, so it
-// is stated here rather than read. Task-specific: log256-bytelen/v1.
-const FLOOR = 69;
+/**
+ * The trivial floor per task: what a one-word edit already recovers.
+ *
+ * ⚠️ Stated here rather than read, because the registry event does not carry it
+ * -- it comes from proof 3, which lives in the receipt. That was tolerable with
+ * one task and is a liability with four, so the numbers below were re-measured
+ * on 10 September against the committed scenario of each task, and each is the
+ * value that task's own `trivial` contract recovers.
+ *
+ * ⚠️ This page used to hold ONE floor, 69, labelled "task-specific:
+ * log256-bytelen/v1", and drew it under every run. With four tasks indexed that
+ * would have measured a Uniswap run whose floor is 1 400 against log256's 69,
+ * and shown it clearing the bar by 10 811 gas when its real margin is 9 480.
+ */
+const FLOORS = {
+  "log256-bytelen/v1": 69,
+  "satmul-halved/v1": 42,
+  "hexaddr-inverted/v1": 2240,
+  "vanity-tariff/v1": 1400,
+};
+const HEADROOM = {
+  "log256-bytelen/v1": 284,
+  "satmul-halved/v1": 152,
+  "hexaddr-inverted/v1": 8180,
+  "vanity-tariff/v1": 14137,
+};
 
 const Q = `{
   _meta { block { number } hasIndexingErrors }
@@ -252,8 +288,8 @@ const Q = `{
     totalSavedTotal sumUsdListNano formalCount fuzzedCount unknownCount
     consecutiveUnknown lastLabel
   }
-  runs(orderBy: blockNumber, orderDirection: desc, first: 100) {
-    id runId model { name } scored outcome label savedPerCall maxRegression
+  runs(orderBy: blockNumber, orderDirection: desc, first: 500) {
+    id runId model { name } taskId scored outcome label savedPerCall maxRegression
     relativeProgressE4 usdListNano hcsTopicId hcsSequence receiptHash blockNumber
   }
 }`;
@@ -276,11 +312,11 @@ const short = (h) => h.slice(0, 10) + "…";
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-function plot(runs) {
+function plot(runs, floor) {
   const scored = runs.filter((r) => r.scored).map((r) => ({ ...r, v: Number(r.savedPerCall) }));
   if (!scored.length) return `<p class="state">No scored runs indexed yet.</p>`;
 
-  const vals = scored.map((r) => r.v).concat([0, FLOOR]);
+  const vals = scored.map((r) => r.v).concat([0, floor]);
   const hi = Math.max(...vals), lo = Math.min(...vals);
   const pad = Math.max(12, (hi - lo) * 0.08);
   const top = hi + pad, bot = lo - pad;
@@ -325,7 +361,7 @@ function plot(runs) {
   // ⚠️ Must exceed the label's own line height, not merely be non-zero: at 15px
   // the rule still struck through the text of the mark it had just cleared.
   const CLEAR = 26;
-  for (const ref of [{ v: FLOOR, y: yPx(FLOOR) }, { v: 0, y: yPx(0) }]) {
+  for (const ref of [{ v: floor, y: yPx(floor) }, { v: 0, y: yPx(0) }]) {
     for (const m of placed) {
       if (Math.abs(m.y - ref.y) < CLEAR) {
         m.y = m.v >= ref.v ? ref.y - CLEAR : ref.y + CLEAR;
@@ -350,7 +386,7 @@ function plot(runs) {
    * defect, misreporting is not.
    */
   for (const m of placed) {
-    for (const ref of [{ v: FLOOR, y: yPx(FLOOR) }, { v: 0, y: yPx(0) }]) {
+    for (const ref of [{ v: floor, y: yPx(floor) }, { v: 0, y: yPx(0) }]) {
       const trulyAbove = m.v > ref.v;
       const drawnAbove = m.y < ref.y;
       if (m.v !== ref.v && trulyAbove !== drawnAbove) {
@@ -373,8 +409,8 @@ function plot(runs) {
 
   return `<div class="plot"><div class="band" style="--h:${Math.round(H)}px">
     ${marks}
-    <div class="datum" style="top:${y(FLOOR).toFixed(2)}%">
-      <span class="cap">one-word edit &nbsp;+${FLOOR}</span></div>
+    <div class="datum" style="top:${y(floor).toFixed(2)}%">
+      <span class="cap">one-word edit &nbsp;+${floor}</span></div>
     <div class="zero" style="top:${y(0).toFixed(2)}%">
       <span class="cap">no change &nbsp;0</span></div>
   </div></div>${nudged ? `<p class="nudge">Runs that land within a few gas of each other are
@@ -429,6 +465,7 @@ function runs(rs) {
     return `<tr>
       <td class="hex"><a href="https://sepolia.basescan.org/tx/${r.id.slice(0, 66)}" rel="noopener">${esc(r.runId)}</a></td>
       <td>${esc(r.model.name.split("/").pop())}</td>
+      <td>${esc((r.taskId || "—").split("/")[0])}</td>
       <td class="n">${r.scored ? `<span class="${v < 0 ? "loss" : "gain"}">${v > 0 ? "+" : ""}${v}</span>` : "—"}</td>
       <td class="n">${r.scored ? (Number(r.maxRegression) > 0 ? `+${r.maxRegression} gas` : "none") : "—"}</td>
       <td>${r.scored
@@ -442,11 +479,52 @@ function runs(rs) {
     </tr>`;
   }).join("");
   return `<thead><tr>
-      <th>Run</th><th>Model</th><th class="n">Gas saved per call</th>
+      <th>Run</th><th>Model</th><th>Task</th><th class="n">Gas saved per call</th>
       <th class="n">Worst single input</th>
       <th>How it was checked</th><th class="n">Cost</th>
       <th>Receipt, Hedera</th><th>Content hash</th>
     </tr></thead><tbody>${rows}</tbody>`;
+}
+
+/**
+ * ⚠️ Gas saved per call is NOT comparable across tasks, and this page had no
+ * way to say so. A run on the Uniswap target saves ~10 000 gas per call; a run
+ * on log256 saves tens. Pooling them ranks models by which task they happened
+ * to draw. The plot is therefore a WITHIN-task comparison and names its task;
+ * this table is what lets a reader see the scales are different.
+ */
+function tasks(runs) {
+  const by = new Map();
+  for (const r of runs) {
+    const t = r.taskId || "(unrecorded)";
+    if (!by.has(t)) by.set(t, { scored: 0, attempts: 0 });
+    const e = by.get(t);
+    e.attempts++;
+    if (r.scored) e.scored++;
+  }
+  const rows = [...by.entries()]
+    .sort((a, b) => b[1].scored - a[1].scored)
+    .map(([t, e]) => `<tr>
+      <td>${esc(t)}</td>
+      <td class="n">${HEADROOM[t] != null ? Number(HEADROOM[t]).toLocaleString() : "—"}</td>
+      <td class="n">${FLOORS[t] != null ? Number(FLOORS[t]).toLocaleString() : "—"}</td>
+      <td class="n">${HEADROOM[t] && FLOORS[t] ? Math.round(FLOORS[t] * 100 / HEADROOM[t]) + "%" : "—"}</td>
+      <td class="n">${e.scored} of ${e.attempts}</td>
+    </tr>`).join("");
+  return `<thead><tr>
+      <th>Task</th><th class="n">Room to the expert version</th>
+      <th class="n">Recovered by one word</th><th class="n">Share the one word takes</th>
+      <th class="n">Runs with a patch</th>
+    </tr></thead><tbody>${rows}</tbody>`;
+}
+
+/** The task with the most scored runs — the one the plot can say most about. */
+function focusTask(runs) {
+  const count = new Map();
+  for (const r of runs) if (r.scored) count.set(r.taskId, (count.get(r.taskId) ?? 0) + 1);
+  let best = null, n = -1;
+  for (const [t, c] of count) if (c > n) { best = t; n = c; }
+  return best;
 }
 
 (async () => {
@@ -466,13 +544,24 @@ function runs(rs) {
       on Base Sepolia<br>${d._meta.hasIndexingErrors
         ? `<span class="loss">indexing errors present</span>`
         : "no indexing errors"}`;
-    document.getElementById("plot").outerHTML = `<div id="plot">${plot(d.runs)}</div>`;
+    const focus = focusTask(d.runs);
+    const floor = FLOORS[focus] ?? 0;
+    document.getElementById("plot").outerHTML = `<div id="plot">${
+      focus
+        ? `<p class="sub">Task shown: <b>${esc(focus)}</b>. Gas saved per call is not
+           comparable between tasks — the table above gives each task's own scale.</p>
+           ${plot(d.runs.filter((r) => r.taskId === focus), floor)}`
+        : plot(d.runs, floor)
+    }</div>`;
+    const tasksEl = document.getElementById("tasks");
+    if (tasksEl) tasksEl.innerHTML = tasks(d.runs);
     document.getElementById("models").innerHTML = models(d.models);
     document.getElementById("runs").innerHTML = runs(d.runs);
   } catch (e) {
     live.innerHTML = `<span class="loss">subgraph unreachable</span>`;
-    for (const id of ["plot", "models", "runs"]) {
-      document.getElementById(id).innerHTML =
+    for (const id of ["plot", "tasks", "models", "runs"]) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML =
         `<p class="err">Could not read the subgraph: ${esc(e.message)}.
          Nothing is shown rather than something stale — a leaderboard that keeps
          displaying old numbers when its source is gone is worse than an empty one.</p>`;
