@@ -199,7 +199,12 @@ if (floor != null) {
   const beats = ok.map((r) => r.beats_trivial_by).filter((x) => x != null);
   const below = ok.filter((r) => r.saved_per_call <= floor).length;
   console.log(`  trivial floor    ${floor} gas/call — recoverable by one word, no understanding required`);
-  console.log(`  vs floor         median ${median(beats) >= 0 ? '+' : ''}${median(beats)}   ${below} of ${ok.length} run(s) did NOT beat the one-word edit`);
+  // ⚠️ Never NaN. `median([])` is NaN, and this line printed it beside a run
+  // that had beaten the floor by 9 480 gas/call -- a missing number rendered as
+  // a broken one, on the column that carries the project's central claim.
+  console.log(beats.length
+    ? `  vs floor         median ${median(beats) >= 0 ? '+' : ''}${median(beats)}   ${below} of ${ok.length} run(s) did NOT beat the one-word edit`
+    : `  vs floor         not recorded on any scored run — this is a harness fault, not a result`);
 }
 console.log(`  labels           ${[...new Set(ok.map((r) => r.label))].join(', ')}`);
 

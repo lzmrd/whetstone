@@ -223,6 +223,33 @@ async function callModel({ baseUrl, apiKey, model, messages, maxTokens, temperat
  * "the arithmetic is exact". That is a weaker claim than a budget in a payment
  * system and it is the one this function can support.
  */
+/**
+ * Everything a raw gas measurement needs before it can be published.
+ *
+ * ⚠️ It exists because the two acceptance paths did this INLINE and diverged.
+ * The proved path set four fields; the fuzzed path set two, silently dropping
+ * `trivial_saves_per_call` and `beats_trivial_by` -- the column that answers
+ * the one question a percentage cannot, "did the model beat a one-word edit?".
+ *
+ * The consequence was not cosmetic and not rare. Under D-16 the two targets
+ * with real headroom, vanity and hexaddr, can only ever be accepted on the
+ * FUZZED path, so EVERY run on them would have published a receipt with the
+ * floor comparison missing -- on the tasks where the floor is the whole point.
+ * Caught on the first live run, which printed "vs floor median NaN" beside a
+ * patch that had in fact beaten the floor by 9 480 gas per call.
+ *
+ * @returns the same object, decorated
+ */
+export function decorateGas(gas, { baselineTotal, denominator, trivialGas }) {
+  // Above 100% is expected and legitimate: the patch beat the baseline, it did
+  // not violate a limit. The baseline is not a ceiling.
+  gas.baseline_total = baselineTotal;
+  gas.relative_progress = Number((gas.saved_total / denominator).toFixed(4));
+  gas.trivial_saves_per_call = trivialGas?.saved_per_call ?? null;
+  gas.beats_trivial_by = trivialGas ? gas.saved_per_call - trivialGas.saved_per_call : null;
+  return gas;
+}
+
 export function worstCaseRoundUsd(messages, maxTokens, price) {
   const chars = JSON.stringify(messages).length;
   const inTokens = Math.ceil(chars / 3);
@@ -455,11 +482,7 @@ export async function runAgent({
           // ⚠️ Above 100% is expected and legitimate: the patch beat the
           // baseline, it did not violate a limit. The baseline is not a ceiling.
           // Established at GATE 4 above, before any inference was bought.
-          gas.baseline_total = baselineGas.patch_total;
-          gas.relative_progress = Number((gas.saved_total / denominator).toFixed(4));
-          // ⚠️ The number that says whether anything was understood.
-          gas.trivial_saves_per_call = trivialGas?.saved_per_call ?? null;
-          gas.beats_trivial_by = trivialGas ? gas.saved_per_call - trivialGas.saved_per_call : null;
+          decorateGas(gas, { baselineTotal: baselineGas.patch_total, denominator, trivialGas });
           log(round, 'gas',
             `${gas.saved_per_call} gas/call saved, max regression ${gas.patch_max_regression}, ` +
             `${(gas.relative_progress * 100).toFixed(1)}% of baseline` +
@@ -494,8 +517,11 @@ export async function runAgent({
             log(round, 'fuzzed', `${campaign.runs} runs, seed ${campaign.seed}, no divergence`);
             run.rounds.push({ round, outcome: 'fuzzed', label: 'FUZZED' });
             const gas = await measurePatch(taskBuild.path, built.path, sig, scenario);
-            gas.baseline_total = baselineGas.patch_total;
-            gas.relative_progress = Number((gas.saved_total / denominator).toFixed(4));
+            decorateGas(gas, { baselineTotal: baselineGas.patch_total, denominator, trivialGas });
+            log(round, 'gas',
+              `${gas.saved_per_call} gas/call saved, max regression ${gas.patch_max_regression}, ` +
+              `${(gas.relative_progress * 100).toFixed(1)}% of baseline` +
+              (gas.beats_trivial_by != null ? `, ${gas.beats_trivial_by >= 0 ? '+' : ''}${gas.beats_trivial_by} vs the one-word edit` : ''));
             run.gas = gas;
             run.fuzz_campaign = campaign;
             run.patch = { source: got.source, runtime: built.runtime, path: built.path, label: 'FUZZED' };
