@@ -99,42 +99,68 @@ pre i{font-style:normal;color:var(--rule)}
      white-space:nowrap}
 
 
-/* ── the loop, drawn once ─────────────────────────────────────
-   ⚠️ ONE motion, and it has to earn itself. This page's credibility is its
-   sobriety; arrows pulsing forever would read as decoration and work against
-   the numbers. A single token traces the route on load, and a control replays
-   it. With prefers-reduced-motion the diagram is complete and still. */
+/* ── the loop, running ────────────────────────────────────────
+   ⚠️ The only motion on this page, and it is not decoration: the packet is a
+   REAL run out of the index -- its task, its model, its verdict, its gas delta
+   -- and the wire lights as that run crosses it. Until the subgraph answers,
+   the packet carries stage names and NO figures: a page whose subject is
+   measured gas must not animate a plausible-looking number, not for a second.
+
+   Continuous motion has three obligations and pays all three: a pause control
+   (WCAG 2.2.2), an automatic stop when the tab is hidden or the diagram is
+   off-screen, and a complete still diagram under prefers-reduced-motion. */
 .flow{margin:1.4rem 0 .4rem}
-.flow svg{width:100%;height:auto;display:block}
-.flow .box{fill:var(--panel);stroke:var(--rule);stroke-width:1}
-.flow .t{font-weight:600;font-size:13px;fill:var(--ink)}
+.flow svg{width:100%;height:auto;display:block;overflow:visible}
+.flow .box{fill:var(--panel);stroke:var(--rule);stroke-width:1;
+           transition:stroke .3s,stroke-width .3s}
+.flow .t{font-weight:600;font-size:13px;fill:var(--ink);transition:fill .3s}
 .flow .n{font-size:10.5px;fill:var(--rule)}
 .flow .route{fill:none;stroke:var(--rule);stroke-width:1.25}
 .flow .route path{fill:none}
 .flow .head{fill:var(--rule)}
-/* ⚠️ The route draws itself STAGE BY STAGE, rather than a token sliding along
-   it. A dash pattern restarts at every subpath, so one "travelling" segment on
-   a six-subpath route renders as six fragments blinking at once -- scattered
-   motion, which is the thing this page must not do. Drawing in sequence is one
-   orchestrated moment and it says the same thing more plainly: this happens,
-   then this. Every segment is shorter than 200, so one dash length covers all. */
-.flow .pulse{opacity:0}
-.flow .pulse path{fill:none;stroke:var(--gain);stroke-width:2.5;stroke-linecap:round;
-                  stroke-dasharray:420;stroke-dashoffset:420}
-.flow.run .pulse{opacity:1;animation:fadeout .7s linear 3.7s forwards}
-.flow.run .pulse path{animation:draw .5s ease-out forwards}
-.flow.run .pulse path:nth-child(2){animation-delay:.5s}
-.flow.run .pulse path:nth-child(3){animation-delay:1s}
-.flow.run .pulse path:nth-child(4){animation-delay:1.5s}
-.flow.run .pulse path:nth-child(5){animation-delay:2s}
-.flow.run .pulse path:nth-child(6){animation-delay:2.5s}
-@keyframes draw{to{stroke-dashoffset:0}}
-@keyframes fadeout{to{opacity:0}}
-.flow .cap{font-size:10.5px;fill:var(--rule)}
+.flow .cap{font-size:10.5px;fill:var(--rule);transition:fill .3s}
+.flow .cap.on{fill:var(--gain)}
+
+/* the stage the packet is inside. `bad` follows `on` so a rejected run's
+   colour wins when both are set. */
+.flow .node.on .box{stroke:var(--gain);stroke-width:2;
+                    fill:color-mix(in srgb, var(--gain) 9%, var(--panel))}
+.flow .node.on .t{fill:var(--gain)}
+.flow .node.bad .box{stroke:var(--loss);
+                     fill:color-mix(in srgb, var(--loss) 9%, var(--panel))}
+.flow .node.bad .t{fill:var(--loss)}
+/* ⚠️ The halo grows by stroke-width, not by transform. A scale needs
+   transform-box:fill-box to stay centred on its own shape, and where that is
+   not honoured the ring flies off the corner of the viewBox instead. */
+.flow .ring{fill:none;stroke:var(--gain);stroke-width:0;opacity:0}
+.flow .node.bad .ring{stroke:var(--loss)}
+.flow .node.on .ring{animation:halo .9s ease-out}
+@keyframes halo{from{opacity:.55;stroke-width:2}to{opacity:0;stroke-width:12}}
+
+/* the wire lights under the packet; the dash offset is set per frame in JS,
+   so this is one path per leg and the phase never restarts mid-flight */
+.flow .wire{fill:none;stroke:var(--gain);stroke-width:2.5;stroke-linecap:round;
+            opacity:0;transition:opacity .45s linear}
+.flow .wire.lit{opacity:1;transition:none;filter:drop-shadow(0 0 3px var(--gain))}
+/* what the lap has already crossed stays dimly lit, so the circuit fills in
+   over the lap and empties when the next run starts */
+.flow .wire.done{opacity:.3}
+.flow .wire.bad{stroke:var(--loss)}
+.flow .wire.bad.lit{filter:drop-shadow(0 0 3px var(--loss))}
+
+.flow .chip .dot{fill:var(--gain);stroke:var(--ground);stroke-width:1.5}
+.flow .chip rect{fill:var(--ground);stroke:var(--gain);stroke-width:1.25}
+.flow .chip text{font-size:11px;font-weight:600;fill:var(--ink)}
+.flow .chip.bad .dot{fill:var(--loss)}
+.flow .chip.bad rect{stroke:var(--loss)}
+
+.now{margin:.35rem 0 0;font-size:.8rem;color:var(--rule);
+     display:flex;gap:1rem;align-items:baseline;flex-wrap:wrap}
+.now b{font-weight:600;color:var(--ink)}
 .replay{background:none;border:0;padding:0;font:inherit;font-size:.8rem;
         color:var(--link);cursor:pointer;text-decoration:underline}
 @media (prefers-reduced-motion:reduce){
-  .flow.run .pulse{animation:none;opacity:0}
+  .flow .node.on .ring{animation:none}
 }
 
 .ask{margin:2.75rem 0 .25rem;font-size:1.25rem;font-weight:700;letter-spacing:-.01em}
@@ -235,8 +261,7 @@ tr.benched td{color:var(--rule)}
       <!-- ⚠️ Six separate paths, not one with six subpaths. `marker-end` is drawn
            at the LAST vertex of a path, singular -- with subpaths that is one
            arrowhead for the whole route, which is what the first render showed:
-           a serpentine with no direction. The pulse below stays a single path,
-           because a dash pattern does run across subpaths. -->
+           a serpentine with no direction. -->
       <g class="route" marker-end="url(#ah)">
         <path d="M220 62 H384"/>
         <path d="M570 62 H734"/>
@@ -245,39 +270,62 @@ tr.benched td{color:var(--rule)}
         <path d="M390 198 H226"/>
         <path d="M40 198 H14 V62 H34"/>
       </g>
-      <g class="pulse" aria-hidden="true">
-        <path d="M220 62 H390"/>
-        <path d="M570 62 H740"/>
-        <path d="M830 90 V170"/>
-        <path d="M740 198 H570"/>
-        <path d="M390 198 H220"/>
-        <path d="M40 198 H14 V62 H40"/>
+      <g class="wires" aria-hidden="true">
+        <path class="wire" d="M220 62 H384"/>
+        <path class="wire" d="M570 62 H734"/>
+        <path class="wire" d="M830 90 V164"/>
+        <path class="wire" d="M740 198 H576"/>
+        <path class="wire" d="M390 198 H226"/>
+        <path class="wire" d="M40 198 H14 V62 H34"/>
       </g>
 
-      <g><rect class="box" x="40"  y="34" width="180" height="56"/>
+      <g class="node" id="fn0">
+         <rect class="box" x="40"  y="34" width="180" height="56"/>
+         <rect class="ring" x="40"  y="34" width="180" height="56"/>
          <text class="t" x="130" y="58" text-anchor="middle">The task</text>
          <text class="n" x="130" y="76" text-anchor="middle">mutated, comments stripped</text></g>
-      <g><rect class="box" x="390" y="34" width="180" height="56"/>
+      <g class="node" id="fn1">
+         <rect class="box" x="390" y="34" width="180" height="56"/>
+         <rect class="ring" x="390" y="34" width="180" height="56"/>
          <text class="t" x="480" y="58" text-anchor="middle">Paid call</text>
          <text class="n" x="480" y="76" text-anchor="middle">HBAR settles first</text></g>
-      <g><rect class="box" x="740" y="34" width="180" height="56"/>
+      <g class="node" id="fn2">
+         <rect class="box" x="740" y="34" width="180" height="56"/>
+         <rect class="ring" x="740" y="34" width="180" height="56"/>
          <text class="t" x="830" y="58" text-anchor="middle">The patch</text>
          <text class="n" x="830" y="76" text-anchor="middle">whatever the model returns</text></g>
 
-      <g><rect class="box" x="740" y="170" width="180" height="56"/>
+      <g class="node" id="fn3">
+         <rect class="box" x="740" y="170" width="180" height="56"/>
+         <rect class="ring" x="740" y="170" width="180" height="56"/>
          <text class="t" x="830" y="194" text-anchor="middle">Same behaviour?</text>
          <text class="n" x="830" y="212" text-anchor="middle">prover, else two gates</text></g>
-      <g><rect class="box" x="390" y="170" width="180" height="56"/>
+      <g class="node" id="fn4">
+         <rect class="box" x="390" y="170" width="180" height="56"/>
+         <rect class="ring" x="390" y="170" width="180" height="56"/>
          <text class="t" x="480" y="194" text-anchor="middle">Cheaper?</text>
          <text class="n" x="480" y="212" text-anchor="middle">committed scenario</text></g>
-      <g><rect class="box" x="40"  y="170" width="180" height="56"/>
+      <g class="node" id="fn5">
+         <rect class="box" x="40"  y="170" width="180" height="56"/>
+         <rect class="ring" x="40"  y="170" width="180" height="56"/>
          <text class="t" x="130" y="194" text-anchor="middle">Recorded</text>
          <text class="n" x="130" y="212" text-anchor="middle">Hedera, then Base Sepolia</text></g>
 
-      <text class="cap" x="215" y="256">the allocator reads the index and buys the next call —
+      <!-- the packet: a dot riding the wire, with what it is carrying held
+           above it so it never sits on a box's own label -->
+      <g class="chip" id="fchip" opacity="0" aria-hidden="true">
+        <g id="fchiplabel">
+          <rect x="-60" y="-32" width="120" height="21" rx="3"/>
+          <text y="-17" text-anchor="middle"></text>
+        </g>
+        <circle class="dot" cx="0" cy="0" r="4.5"/>
+      </g>
+
+      <text class="cap" id="fcap" x="215" y="256">the allocator reads the index and buys the next call —
         a fixed policy, not a model</text>
     </svg>
-    <p style="margin:.2rem 0 0"><button class="replay" type="button" id="replay">replay</button></p>
+    <p class="now"><span id="fnow">waiting for the index…</span
+      ><button class="replay" type="button" id="fpause">pause</button></p>
   </div>
 
   <h2 class="ask">Question 1 — does it still do the same thing?</h2>
@@ -538,14 +586,14 @@ function models(ms) {
     const reviewedBy = LATER_VERSION_REVIEWED[m.name];
     const benched = Number(m.consecutiveFailures) >= 2 || Number(m.consecutiveUnknown) >= 2;
     const perDollar = Number(m.sumUsdListNano) > 0
-      ? Math.round(Number(m.totalSavedTotal) / (Number(m.sumUsdListNano) / 1e9)).toLocaleString()
+      ? Math.round(Number(m.totalSavedTotal) / (Number(m.sumUsdListNano) / 1e9)).toLocaleString("en-US")
       : "—";
     return `<tr class="${benched ? "benched" : ""}">
       <td>${esc(m.name)}${reviewedBy
         ? ` <span class="tag no" title="${esc(reviewedBy)} was used to red-team this specification. This row is an EARLIER version, whose weights predate that review, so it is scored — and the overlap is declared here rather than left to be noticed.">later version reviewed this</span>`
         : ""}</td>
       <td class="n">${m.runCount} of ${m.attemptCount}</td>
-      <td class="n ${Number(m.totalSavedTotal) < 0 ? "loss" : Number(m.totalSavedTotal) > 0 ? "gain" : ""}">${Number(m.totalSavedTotal).toLocaleString()}</td>
+      <td class="n ${Number(m.totalSavedTotal) < 0 ? "loss" : Number(m.totalSavedTotal) > 0 ? "gain" : ""}">${Number(m.totalSavedTotal).toLocaleString("en-US")}</td>
       <td class="n">${usd(m.sumUsdListNano)}</td>
       <td class="n">${perDollar}</td>
       <td>${m.formalCount} proved, ${m.fuzzedCount} fuzzed, ${m.unknownCount} undecided</td>
@@ -609,8 +657,8 @@ function tasks(runs) {
     .sort((a, b) => b[1].scored - a[1].scored)
     .map(([t, e]) => `<tr>
       <td>${esc(t)}</td>
-      <td class="n">${HEADROOM[t] != null ? Number(HEADROOM[t]).toLocaleString() : "—"}</td>
-      <td class="n">${FLOORS[t] != null ? Number(FLOORS[t]).toLocaleString() : "—"}</td>
+      <td class="n">${HEADROOM[t] != null ? Number(HEADROOM[t]).toLocaleString("en-US") : "—"}</td>
+      <td class="n">${FLOORS[t] != null ? Number(FLOORS[t]).toLocaleString("en-US") : "—"}</td>
       <td class="n">${HEADROOM[t] && FLOORS[t] ? Math.round(FLOORS[t] * 100 / HEADROOM[t]) + "%" : "—"}</td>
       <td class="n">${e.scored} of ${e.attempts}</td>
     </tr>`).join("");
@@ -632,21 +680,224 @@ function focusTask(runs) {
 
 
 /**
- * ⚠️ The only motion on this page, and it runs once.
+ * ⚠️ The only motion on this page, and it carries data rather than decorating.
  *
- * Restarting a CSS animation needs the class removed, a reflow forced, and the
- * class put back -- without the reflow the browser coalesces the two changes
- * and nothing happens.
+ * The packet is a real run out of the index -- its task, its model, its
+ * verdict, its gas delta -- cycling through the most recent ones. Before the
+ * subgraph answers it carries STAGE NAMES and no figures, because a page whose
+ * whole subject is measured gas must not animate a plausible-looking number,
+ * not even for the second and a half before the real one arrives. If the index
+ * is unreachable it says so and keeps carrying stage names.
+ *
+ * A rejected run still goes all the way round: the call was paid for, so it is
+ * recorded as an attempt. That is the honest shape of the loop, and it is why
+ * the packet changes colour at the gate instead of leaving the circuit.
+ *
+ * Continuous motion owes the reader a pause control (WCAG 2.2.2), a stop when
+ * it cannot be seen, and a still diagram under prefers-reduced-motion.
  */
+let flowFeed = null;
+
 (function () {
   const flow = document.getElementById("flow");
-  const btn = document.getElementById("replay");
-  if (!flow || !btn) return;
+  if (!flow) return;
+  const chip = document.getElementById("fchip");
+  const label = document.getElementById("fchiplabel");
+  const plate = label.querySelector("rect");
+  const text = label.querySelector("text");
+  const cap = document.getElementById("fcap");
+  const nowEl = document.getElementById("fnow");
+  const btn = document.getElementById("fpause");
+  const nodes = [0, 1, 2, 3, 4, 5].map((i) => document.getElementById("fn" + i));
+  const wires = Array.from(flow.querySelectorAll(".wire"));
+  /* The one datum the packet never carries: the sequence number the receipt
+     actually got on Hedera. It replaces the Recorded box's own line while the
+     packet is inside it, and is put back when the packet leaves. */
+  const live5 = document.querySelector("#fn5 .n");
+  const REST5 = live5.textContent;
+
+  /* Where the packet enters and leaves each stage. Same coordinates as the
+     route above; `bare` is the return leg, whose payload is a policy rather
+     than a value, so it travels as a dot and lights the caption instead. */
+  const LEGS = [
+    { to: 1, pts: [[220, 62], [384, 62]] },
+    { to: 2, pts: [[570, 62], [734, 62]] },
+    { to: 3, pts: [[830, 90], [830, 164]] },
+    { to: 4, pts: [[740, 198], [576, 198]] },
+    { to: 5, pts: [[390, 198], [226, 198]] },
+    { to: 0, pts: [[40, 198], [14, 198], [14, 62], [34, 62]], bare: true },
+  ];
+  const CUM = LEGS.map((l) => {
+    const d = [0];
+    for (let i = 1; i < l.pts.length; i++) {
+      d.push(d[i - 1] + Math.hypot(l.pts[i][0] - l.pts[i - 1][0], l.pts[i][1] - l.pts[i - 1][1]));
+    }
+    return d;
+  });
+  const pointAt = (li, t) => {
+    const pts = LEGS[li].pts, d = CUM[li], want = d[d.length - 1] * t;
+    let i = 1;
+    while (i < pts.length - 1 && want > d[i]) i++;
+    const u = Math.min(1, Math.max(0, (want - d[i - 1]) / (d[i] - d[i - 1] || 1)));
+    return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * u,
+            pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * u];
+  };
+
+  const WAITING = {
+    legs: ["the mutated task", "a paid call", "the patch", "the verdict", "the gas"],
+    badFrom: Infinity, now: "waiting for the index…",
+  };
+
+  /* ⚠️ Not every lap has a patch in it. A call that failed, or came back in the
+     wrong shape or cut off, still went round: it was paid for, so it is
+     recorded as an attempt. Saying "the patch" on those laps would be the
+     diagram telling a story the receipt does not. */
+  const NOPATCH = {
+    provider_error: "the call failed",
+    format: "an answer in the wrong shape",
+    truncated: "an answer cut off",
+    compile: "a patch that would not compile",
+  };
+  let stories = [WAITING], si = 0, story = WAITING;
+
+  const short_ = (n) => n.split("/").pop();
+  function flowStories(rs) {
+    return rs.slice(0, 6).map((r) => {
+      const saved = Number(r.savedPerCall);
+      const gas = !r.scored ? "an attempt, still paid"
+        : saved > 0 ? "+" + saved.toLocaleString("en-US") + " gas saved"
+        : saved < 0 ? saved.toLocaleString("en-US") + " gas, worse"
+        : "no change";
+      const missing = NOPATCH[r.outcome];
+      const verdict = r.label ? plain(r.label)
+        : r.outcome === "refuted" ? "not equivalent"
+        : missing ? "nothing to check" : "no verdict";
+      return {
+        badFrom: missing ? 2 : r.scored ? Infinity : 3,
+        seq: r.hcsSequence,
+        legs: [r.taskId, short_(r.model.name), missing ?? "the patch", verdict, gas],
+        now: `<b>run ${esc(r.runId)}</b> · ${esc(r.taskId)} × ${esc(short_(r.model.name))}
+              · ${usd(r.usdListNano)}${r.hcsSequence ? ` · Hedera seq ${esc(r.hcsSequence)}` : ""}`,
+      };
+    });
+  }
+
+  const T = { emerge: 180, travel: 1050, absorb: 190, dwell: 700 };
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  let li = 0, phase = "emerge", pstart = 0, raf = 0;
+  let running = false, userPaused = false, onScreen = true, pausedAt = 0;
+
+  function carry(v) {
+    const bad = li >= story.badFrom;
+    chip.classList.toggle("bad", bad);
+    wires[li].classList.toggle("bad", bad);
+    if (!v) { label.setAttribute("opacity", "0"); return; }
+    label.setAttribute("opacity", "1");
+    text.textContent = v;
+    const w = Math.max(46, text.getComputedTextLength()) + 22;
+    plate.setAttribute("x", (-w / 2).toFixed(1));
+    plate.setAttribute("width", w.toFixed(1));
+  }
+  const place = (p, s) => chip.setAttribute("transform", `translate(${p[0].toFixed(1)} ${p[1].toFixed(1)}) scale(${s.toFixed(3)})`);
+  function prep() {
+    carry(LEGS[li].bare ? null : story.legs[li]);
+    cap.classList.toggle("on", !!LEGS[li].bare);
+    const w = wires[li];
+    w.classList.remove("lit");
+    w.style.strokeDasharray = w.getTotalLength();
+    w.style.strokeDashoffset = w.getTotalLength();
+  }
+
+  function frame(now) {
+    raf = requestAnimationFrame(frame);
+    const e = now - pstart, leg = LEGS[li], w = wires[li];
+    if (phase === "emerge") {
+      const t = Math.min(1, e / T.emerge);
+      place(pointAt(li, 0), t);
+      chip.style.opacity = 1;
+      if (t === 1) {
+        phase = "travel"; pstart = now;
+        for (const n of nodes) n.classList.remove("on", "bad");
+        w.classList.add("lit");
+      }
+    } else if (phase === "travel") {
+      const k = ease(Math.min(1, e / T.travel));
+      place(pointAt(li, k), 1);
+      w.style.strokeDashoffset = (w.getTotalLength() * (1 - k)).toFixed(1);
+      if (e >= T.travel) {
+        phase = "absorb"; pstart = now;
+        nodes[leg.to].classList.add("on");
+        if (li >= story.badFrom && leg.to !== 0) nodes[leg.to].classList.add("bad");
+        if (leg.to === 5 && story.seq) live5.textContent = "Hedera seq " + story.seq;
+      }
+    } else if (phase === "absorb") {
+      const t = Math.min(1, e / T.absorb);
+      place(pointAt(li, 1), 1 - t);
+      if (t === 1) {
+        phase = "dwell"; pstart = now; chip.style.opacity = 0;
+        w.classList.remove("lit"); w.classList.add("done");
+      }
+    } else if (e >= T.dwell) {
+      li = (li + 1) % LEGS.length;
+      live5.textContent = REST5;
+      if (li === 0) {
+        for (const x of wires) x.classList.remove("done", "bad");
+        si = (si + 1) % stories.length; story = stories[si]; nowEl.innerHTML = story.now;
+      }
+      prep(); phase = "emerge"; pstart = now;
+    }
+  }
+
+  function start() {
+    if (running || userPaused || !onScreen || document.hidden) return;
+    running = true;
+    if (pausedAt) { pstart += performance.now() - pausedAt; pausedAt = 0; }
+    raf = requestAnimationFrame(frame);
+  }
+  function stop() {
+    if (!running) return;
+    running = false; pausedAt = performance.now(); cancelAnimationFrame(raf);
+  }
+
   const still = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const run = () => { flow.classList.remove("run"); void flow.offsetWidth; flow.classList.add("run"); };
-  btn.addEventListener("click", run);
-  if (still.matches) { btn.hidden = true; return; }
-  run();
+  if (still.matches) {
+    /* A complete, still diagram: the whole route with every arrowhead is
+       already drawn above, so nothing here has to move for it to be read. */
+    btn.hidden = true;
+    nowEl.textContent = "Motion is off, so the whole loop is shown at once.";
+    flowFeed = (rs) => {
+      const s = flowStories(rs);
+      nowEl.innerHTML = s.length ? "Most recent: " + s[0].now : "The index is unreachable.";
+    };
+    return;
+  }
+
+  flowFeed = (rs) => {
+    const s = flowStories(rs);
+    if (!s.length) { nowEl.textContent = "The index is unreachable — the loop is showing stage names only."; return; }
+    stories = s; si = 0; story = s[0];
+    nowEl.innerHTML = story.now;
+    for (const x of wires) x.classList.remove("done", "bad");
+    carry(LEGS[li].bare ? null : story.legs[li]);
+  };
+
+  btn.addEventListener("click", () => {
+    userPaused = !userPaused;
+    btn.textContent = userPaused ? "play" : "pause";
+    if (userPaused) stop(); else start();
+  });
+  document.addEventListener("visibilitychange", () => (document.hidden ? stop() : start()));
+  if (window.IntersectionObserver) {
+    new IntersectionObserver((es) => {
+      onScreen = es[0].isIntersecting;
+      if (onScreen) start(); else stop();
+    }, { threshold: 0 }).observe(flow);
+  }
+
+  nodes[0].classList.add("on");
+  prep();
+  pstart = performance.now();
+  start();
 })();
 
 (async () => {
@@ -662,7 +913,7 @@ function focusTask(runs) {
     if (body.errors) throw new Error(body.errors.map((e) => e.message).join("; "));
     const d = body.data;
 
-    live.innerHTML = `indexed to block <b>${Number(d._meta.block.number).toLocaleString()}</b>
+    live.innerHTML = `indexed to block <b>${Number(d._meta.block.number).toLocaleString("en-US")}</b>
       on Base Sepolia<br>${d._meta.hasIndexingErrors
         ? `<span class="loss">indexing errors present</span>`
         : "no indexing errors"}`;
@@ -679,8 +930,10 @@ function focusTask(runs) {
     if (tasksEl) tasksEl.innerHTML = tasks(d.runs);
     document.getElementById("models").innerHTML = models(d.models);
     document.getElementById("runs").innerHTML = runs(d.runs);
+    if (flowFeed) flowFeed(d.runs);
   } catch (e) {
     live.innerHTML = `<span class="loss">subgraph unreachable</span>`;
+    if (flowFeed) flowFeed([]);
     for (const id of ["plot", "tasks", "models", "runs"]) {
       const el = document.getElementById(id);
       if (el) el.innerHTML =
