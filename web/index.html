@@ -98,6 +98,45 @@ pre i{font-style:normal;color:var(--rule)}
 .lab{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--rule);
      white-space:nowrap}
 
+
+/* ── the loop, drawn once ─────────────────────────────────────
+   ⚠️ ONE motion, and it has to earn itself. This page's credibility is its
+   sobriety; arrows pulsing forever would read as decoration and work against
+   the numbers. A single token traces the route on load, and a control replays
+   it. With prefers-reduced-motion the diagram is complete and still. */
+.flow{margin:1.4rem 0 .4rem}
+.flow svg{width:100%;height:auto;display:block}
+.flow .box{fill:var(--panel);stroke:var(--rule);stroke-width:1}
+.flow .t{font-weight:600;font-size:13px;fill:var(--ink)}
+.flow .n{font-size:10.5px;fill:var(--rule)}
+.flow .route{fill:none;stroke:var(--rule);stroke-width:1.25}
+.flow .route path{fill:none}
+.flow .head{fill:var(--rule)}
+/* ⚠️ The route draws itself STAGE BY STAGE, rather than a token sliding along
+   it. A dash pattern restarts at every subpath, so one "travelling" segment on
+   a six-subpath route renders as six fragments blinking at once -- scattered
+   motion, which is the thing this page must not do. Drawing in sequence is one
+   orchestrated moment and it says the same thing more plainly: this happens,
+   then this. Every segment is shorter than 200, so one dash length covers all. */
+.flow .pulse{opacity:0}
+.flow .pulse path{fill:none;stroke:var(--gain);stroke-width:2.5;stroke-linecap:round;
+                  stroke-dasharray:420;stroke-dashoffset:420}
+.flow.run .pulse{opacity:1;animation:fadeout .7s linear 3.7s forwards}
+.flow.run .pulse path{animation:draw .5s ease-out forwards}
+.flow.run .pulse path:nth-child(2){animation-delay:.5s}
+.flow.run .pulse path:nth-child(3){animation-delay:1s}
+.flow.run .pulse path:nth-child(4){animation-delay:1.5s}
+.flow.run .pulse path:nth-child(5){animation-delay:2s}
+.flow.run .pulse path:nth-child(6){animation-delay:2.5s}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes fadeout{to{opacity:0}}
+.flow .cap{font-size:10.5px;fill:var(--rule)}
+.replay{background:none;border:0;padding:0;font:inherit;font-size:.8rem;
+        color:var(--link);cursor:pointer;text-decoration:underline}
+@media (prefers-reduced-motion:reduce){
+  .flow.run .pulse{animation:none;opacity:0}
+}
+
 .ask{margin:2.75rem 0 .25rem;font-size:1.25rem;font-weight:700;letter-spacing:-.01em}
 .ask+p{margin:.35rem 0 1.1rem;max-width:64ch}
 .scroll{overflow-x:auto}
@@ -175,6 +214,70 @@ tr.benched td{color:var(--rule)}
       proved to return the identical value for every one of the 2<sup>256</sup> possible
       inputs.</p>
     </div>
+  </div>
+
+
+  <h2 class="ask">What happens to one call</h2>
+  <p>The loop closes: what the index records is what decides who is paid next. Nothing in it
+  is a model's judgement — the gates and the policy are fixed code.</p>
+
+  <div class="flow" id="flow">
+    <svg viewBox="0 0 960 278" role="img"
+         aria-label="A loop: the mutated task is sent with a paid call, the model returns a patch,
+                     the patch is checked for equivalence, its gas is measured on the committed
+                     scenario, a receipt is published to Hedera and pointed at from Base Sepolia,
+                     and the allocator reads that index to buy the next call.">
+      <defs>
+        <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="9" markerHeight="9"
+                orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" class="head"/></marker>
+      </defs>
+
+      <!-- ⚠️ Six separate paths, not one with six subpaths. `marker-end` is drawn
+           at the LAST vertex of a path, singular -- with subpaths that is one
+           arrowhead for the whole route, which is what the first render showed:
+           a serpentine with no direction. The pulse below stays a single path,
+           because a dash pattern does run across subpaths. -->
+      <g class="route" marker-end="url(#ah)">
+        <path d="M220 62 H384"/>
+        <path d="M570 62 H734"/>
+        <path d="M830 90 V164"/>
+        <path d="M740 198 H576"/>
+        <path d="M390 198 H226"/>
+        <path d="M40 198 H14 V62 H34"/>
+      </g>
+      <g class="pulse" aria-hidden="true">
+        <path d="M220 62 H390"/>
+        <path d="M570 62 H740"/>
+        <path d="M830 90 V170"/>
+        <path d="M740 198 H570"/>
+        <path d="M390 198 H220"/>
+        <path d="M40 198 H14 V62 H40"/>
+      </g>
+
+      <g><rect class="box" x="40"  y="34" width="180" height="56"/>
+         <text class="t" x="130" y="58" text-anchor="middle">The task</text>
+         <text class="n" x="130" y="76" text-anchor="middle">mutated, comments stripped</text></g>
+      <g><rect class="box" x="390" y="34" width="180" height="56"/>
+         <text class="t" x="480" y="58" text-anchor="middle">Paid call</text>
+         <text class="n" x="480" y="76" text-anchor="middle">HBAR settles first</text></g>
+      <g><rect class="box" x="740" y="34" width="180" height="56"/>
+         <text class="t" x="830" y="58" text-anchor="middle">The patch</text>
+         <text class="n" x="830" y="76" text-anchor="middle">whatever the model returns</text></g>
+
+      <g><rect class="box" x="740" y="170" width="180" height="56"/>
+         <text class="t" x="830" y="194" text-anchor="middle">Same behaviour?</text>
+         <text class="n" x="830" y="212" text-anchor="middle">prover, else two gates</text></g>
+      <g><rect class="box" x="390" y="170" width="180" height="56"/>
+         <text class="t" x="480" y="194" text-anchor="middle">Cheaper?</text>
+         <text class="n" x="480" y="212" text-anchor="middle">committed scenario</text></g>
+      <g><rect class="box" x="40"  y="170" width="180" height="56"/>
+         <text class="t" x="130" y="194" text-anchor="middle">Recorded</text>
+         <text class="n" x="130" y="212" text-anchor="middle">Hedera, then Base Sepolia</text></g>
+
+      <text class="cap" x="215" y="256">the allocator reads the index and buys the next call —
+        a fixed policy, not a model</text>
+    </svg>
+    <p style="margin:.2rem 0 0"><button class="replay" type="button" id="replay">replay</button></p>
   </div>
 
   <h2 class="ask">Question 1 — does it still do the same thing?</h2>
@@ -526,6 +629,25 @@ function focusTask(runs) {
   for (const [t, c] of count) if (c > n) { best = t; n = c; }
   return best;
 }
+
+
+/**
+ * ⚠️ The only motion on this page, and it runs once.
+ *
+ * Restarting a CSS animation needs the class removed, a reflow forced, and the
+ * class put back -- without the reflow the browser coalesces the two changes
+ * and nothing happens.
+ */
+(function () {
+  const flow = document.getElementById("flow");
+  const btn = document.getElementById("replay");
+  if (!flow || !btn) return;
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const run = () => { flow.classList.remove("run"); void flow.offsetWidth; flow.classList.add("run"); };
+  btn.addEventListener("click", run);
+  if (still.matches) { btn.hidden = true; return; }
+  run();
+})();
 
 (async () => {
   const live = document.getElementById("live");
