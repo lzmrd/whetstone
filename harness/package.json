@@ -20,7 +20,8 @@
     "web": "node --env-file=../.env src/serve-web.mjs",
     "artifacts:check": "node --env-file=../.env src/check-artifacts.mjs",
     "registry:retry": "node --env-file=../.env src/registry-retry.mjs",
-    "clean": "rm -rf ../.run/c-*"
+    "clean": "rm -rf ../.run/c-*",
+    "batch:all": "node --env-file=../.env src/batch-all.mjs"
   },
   "dependencies": {
     "@hashgraph/sdk": "^2.81.0",

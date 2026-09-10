@@ -26,9 +26,10 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const [, , spec, nRaw = '5', taskPath = '../contracts/src/tasks/Task.sol'] = process.argv;
+const [, , spec, nRaw = '5'] = process.argv;
 if (!spec) {
-  console.error('\nusage: npm run batch -- <provider/model> [n] [task.sol]\n');
+  console.error('\nusage: npm run batch -- <provider/model> [seeds]');
+  console.error('  the task comes from contracts/src/tasks/manifest.json (override with TASK_MANIFEST)\n');
   process.exit(1);
 }
 const n = Number(nRaw);
@@ -58,6 +59,24 @@ await requireSelfCheck();
 console.log('revert payloads compared, instrument order-neutral, scenario digest matches ✓');
 
 const manifest = loadManifest();
+
+/**
+ * ⚠️ From the MANIFEST, not from argv.
+ *
+ * This was a third positional argument defaulting to a hardcoded
+ * '../contracts/src/tasks/Task.sol', and nothing connected it to the manifest
+ * that TASK_MANIFEST actually selects. So a batch on any task but the first
+ * would have run the right code and written the WRONG path into every receipt
+ * -- published to HCS, pointed at from Base Sepolia, and telling a third party
+ * to recompute a file the run never touched. run.mjs has always taken it from
+ * the manifest (`const taskPath = manifest.task.path`); batch.mjs had not, and
+ * the two entry points are exactly where this repository keeps finding the
+ * same shape of defect.
+ *
+ * It could not fire until today, because until today there was one task.
+ */
+const taskPath = manifest.task.path;
+
 process.stdout.write(`preparing task ${manifest.id} — running both proofs … `);
 const prepared = await prepareTask(manifest);
 // ⚠️ Print the OUTCOME, not a fixed string. This line said "proof 2 REFUTED ✓"
